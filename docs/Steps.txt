@@ -1,0 +1,134 @@
+winget install --id Google.CloudSDK -e
+
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Google\Cloud SDK\google-cloud-sdk\bin", "User")
+exit
+# Reopen PowerShell and run:
+gcloud --version
+
+setx BROWSER "C:\Program Files\Google\Chrome\Application\chrome.exe"
+# close/reopen PowerShell, then:
+gcloud auth login
+
+gcloud config set project project-80744ff2-3e39-47f5-a73
+gcloud services enable container.googleapis.com bigquery.googleapis.com logging.googleapis.com compute.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
+gcloud components install kubectl -q
+
+---
+
+# Sink routing diagnostics (commands run)
+
+# Describe sink and list sinks
+gcloud logging sinks describe export-to-bq --project=project-80744ff2-3e39-47f5-a73 --format=json
+gcloud logging sinks list --project=project-80744ff2-3e39-47f5-a73 --format="table(name,destination,writerIdentity)"
+
+# Inspect BigQuery dataset metadata and ACLs
+bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset
+
+# Outcome summary:
+# - Sink `export-to-bq` exists with writerIdentity `serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com`
+# - Dataset `logs_dataset` exists but is in location `us-central1` (regional); Logging exports to BigQuery typically require a multi-region dataset like `US` or `EU`.
+
+# Quick recommended fix (create US multi-region dataset and update sink):
+bq --location=US mk --dataset project-80744ff2-3e39-47f5-a73:logs_dataset_us
+gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 \
+	--member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" \
+	--role="roles/bigquery.dataEditor"
+gcloud logging sinks update export-to-bq \
+	--destination="bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset_us" \
+	--project=project-80744ff2-3e39-47f5-a73
+
+---
+
+---
+
+# Full chronological actions performed (session log)
+
+# 1) Local SDK install and PATH
+winget install --id Google.CloudSDK -e
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Google\Cloud SDK\google-cloud-sdk\bin", "User")
+setx BROWSER "C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+# 2) Authenticate and set project
+gcloud auth login
+gcloud config set project project-80744ff2-3e39-47f5-a73
+
+# 3) Create ADC for Terraform (Application Default Credentials)
+gcloud auth application-default login
+
+# 4) Enable APIs
+gcloud services enable container.googleapis.com bigquery.googleapis.com logging.googleapis.com compute.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
+
+# 5) Install kubectl component and fix bundled-Python issue
+gcloud components copy-bundled-python
+gcloud components install kubectl -q
+
+# 6) Terraform init + apply (and fixes)
+cd terraform
+terraform init
+terraform apply -var="project_id=project-80744ff2-3e39-47f5-a73" -var="region=us-central1" -auto-approve
+
+# Fixes applied during Terraform runs:
+# - Added `initial_node_count = 1` to `google_container_cluster.primary` to satisfy API validation
+# - Updated logging sink IAM binding to use the sink resource's `writer_identity` value
+# - Created ADC when Terraform complained about missing application-default credentials
+
+# 7) Terraform results (partial)
+# - BigQuery dataset `logs_dataset` created (location: us-central1)
+# - Logging sink `export-to-bq` created (writerIdentity: service-11856948072@gcp-sa-logging.iam.gserviceaccount.com)
+# - VPC `gke-vpc`, subnet `gke-primary-subnet`, node pool `primary-pool` (3 nodes)
+# - GKE cluster `gke-primary` reported "Creation complete after 16m38s" but the apply process was interrupted and exited
+
+# 8) Observability sink diagnostics and recommended fix
+# See above Sink routing diagnostics section: create multi-region dataset `logs_dataset_us` and update sink, or update Terraform to set dataset `location = "US"` and re-run apply.
+
+---
+
+# Sink remediation performed (executed):
+
+# Created US multi-region dataset and recreated sink pointing to it
+bq --location=US mk --dataset project-80744ff2-3e39-47f5-a73:logs_dataset_us
+gcloud logging sinks create export-to-bq bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset_us --log-filter='resource.type="k8s_container"' --project=project-80744ff2-3e39-47f5-a73
+gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 --member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" --role="roles/bigquery.dataEditor"
+
+# Verification (immediate):
+# - Sink now points at `logs_dataset_us`; writerIdentity: serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com
+# - Dataset `logs_dataset_us` location: US
+# - No tables present yet (log ingestion may take several minutes)
+
+# Sink error discovered during investigation:
+# - logName: projects/project-80744ff2-3e39-47f5-a73/logs/logging.googleapis.com%2Fsink_error
+# - severity: ERROR
+# - error_code: table_invalid_schema
+# - detail: Cannot convert value to floating point (bad value): 2026-07-15T00:25:05Z
+# - destination: bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset
+
+# Notes:
+# - The error points to schema mismatch in the original dataset `logs_dataset` and explains earlier routing failures.
+# - Recreating the sink to `logs_dataset_us` avoids the old dataset's schema issues.
+
+
+I'll create a US multi-region BigQuery dataset, grant the sink writer IAM, update the sink destination, and verify results.
+
+bq --location=US mk --dataset project-80744ff2-3e39-47f5-a73:logs_dataset_us; gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 --member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" --role="roles/bigquery.dataEditor"; gcloud logging sinks update export-to-bq --destination="bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset_us" --project=project-80744ff2-3e39-47f5-a73; gcloud logging sinks describe export-to-bq --project=project-80744ff2-3e39-47f5-a73 --format=json; bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset_us
+
+gcloud logging sinks delete export-to-bq --project=project-80744ff2-3e39-47f5-a73 -q ; true; gcloud logging sinks create export-to-bq bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset_us --log-filter='resource.type="k8s_container"' --project=project-80744ff2-3e39-47f5-a73 --format=json; gcloud logging sinks describe export-to-bq --project=project-80744ff2-3e39-47f5-a73 --format=json; gcloud logging sinks list --project=project-80744ff2-3e39-47f5-a73 --format="table(name,destination,writerIdentity)"
+
+Now I'll grant the sink writer roles/bigquery.dataEditor at the project level and re-check the dataset ACL.
+
+gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 --member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" --role="roles/bigquery.dataEditor"; bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset_us
+
+I'll list tables in the new dataset to see whether the sink created tables yet.
+
+bq ls --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset_us
+
+
+bq show --schema --format=prettyjson project-80744ff2-3e39-47f5-a73:logs_dataset_us.stderr_20260715; bq head --max_rows=10 --format=prettyjson project-80744ff2-3e39-47f5-a73:logs_dataset_us.stderr_20260715
+
+gcloud projects get-iam-policy project-80744ff2-3e39-47f5-a73 --flatten='bindings[].members' --filter='bindings.members:serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com' --format='table(bindings.role,bindings.members)'; echo '--- logs_dataset_us ACL ---'; bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset_us | python -c "import sys, json; d=json.load(sys.stdin); print([a for a in d['access'] if a.get('userByEmail','').endswith('@gcp-sa-logging.iam.gserviceaccount.com')])"; echo '--- logs_dataset ACL ---'; bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset | python -c "import sys, json; d=json.load(sys.stdin); print([a for a in d['access'] if a.get('userByEmail','').endswith('@gcp-sa-logging.iam.gserviceaccount.com')])"
+ROLE                        MEMBERS
+roles/bigquery.dataEditor   serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com
+roles/logging.serviceAgent  serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com
+--- logs_dataset_us ACL ---
+[]
+--- logs_dataset ACL ---
+[{'role': 'WRITER', 'userByEmail': 'service-11856948072@gcp-sa-logging.iam.gserviceaccount.com'}]

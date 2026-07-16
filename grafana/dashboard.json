@@ -1,0 +1,15 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": null,
+    "title": "GKE Observability - Quick",
+    "panels": [
+      { "type": "timeseries", "title": "Error Rate", "gridPos": {"h":6,"w":12,"x":0,"y":0} },
+      { "type": "timeseries", "title": "Pod Restarts", "gridPos": {"h":6,"w":12,"x":12,"y":0} },
+      { "type": "timeseries", "title": "Latency (p50/p95/p99)", "gridPos": {"h":6,"w":12,"x":0,"y":6} },
+      { "type": "timeseries", "title": "CPU / Memory Trends", "gridPos": {"h":6,"w":12,"x":12,"y":6} }
+    ],
+    "schemaVersion": 36,
+    "version": 0
+  }
+}

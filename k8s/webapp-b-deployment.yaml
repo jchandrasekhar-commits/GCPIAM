@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-b
+  labels:
+    app: webapp-b
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp-b
+  template:
+    metadata:
+      labels:
+        app: webapp-b
+    spec:
+      serviceAccountName: webapp-ksa
+      automountServiceAccountToken: false
+      containers:
+      - name: webapp-b
+        image: gcr.io/google-samples/hello-app:1.0
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
