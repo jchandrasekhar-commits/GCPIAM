@@ -132,3 +132,73 @@ roles/logging.serviceAgent  serviceAccount:service-11856948072@gcp-sa-logging.ia
 []
 --- logs_dataset ACL ---
 [{'role': 'WRITER', 'userByEmail': 'service-11856948072@gcp-sa-logging.iam.gserviceaccount.com'}]
+
+---
+
+# Assignment Sections (Appended)
+
+## 1) IaC alignment and re-apply
+1. Ensure Terraform reflects the sink fix:
+	- `terraform/main.tf`: dataset `location = "US"`
+	- `terraform/variables.tf`: `bq_dataset = "logs_dataset_us"`
+2. Re-apply infrastructure:
+	- `cd terraform`
+	- `terraform init`
+	- `terraform plan -var="project_id=PROJECT_ID" -var="region=us-central1"`
+	- `terraform apply -var="project_id=PROJECT_ID" -var="region=us-central1" -auto-approve`
+
+## 2) Deploy both apps and HPAs
+1. Apply workload/service manifests:
+	- `kubectl apply -f k8s/webapp-serviceaccount.yaml`
+	- `kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml`
+	- `kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml`
+2. Validate rollouts:
+	- `kubectl rollout status deployment/webapp-a -n default`
+	- `kubectl rollout status deployment/webapp-b -n default`
+	- `kubectl get hpa -n default`
+
+## 3) Smoke-test LoadBalancer endpoint
+1. Get external IPs:
+	- `kubectl get svc webapp-a webapp-b -n default -o wide`
+2. Smoke test:
+	- `curl.exe -sS -m 10 http://<WEBAPP_A_EXTERNAL_IP>`
+	- `curl.exe -sS -m 10 http://<WEBAPP_B_EXTERNAL_IP>`
+
+## 4) Optional ingress path routing (NodePort patch)
+1. Patch service types to NodePort for GKE ingress backend compatibility:
+	- `kubectl patch svc webapp-a -n default -p '{"spec":{"type":"NodePort"}}'`
+	- `kubectl patch svc webapp-b -n default -p '{"spec":{"type":"NodePort"}}'`
+2. Apply ingress:
+	- `kubectl apply -f k8s/ingress.yaml`
+3. Validate path routing once ingress IP is assigned:
+	- `curl.exe -sS -m 10 http://<INGRESS_IP>/a`
+	- `curl.exe -sS -m 10 http://<INGRESS_IP>/b`
+
+## 5) Widen sink for HTTP load balancer logs
+1. Update sink filter to include LB logs needed for request latency query:
+	- `gcloud logging sinks update export-to-bq --project=PROJECT_ID --log-filter='resource.type="k8s_container" OR resource.type="http_load_balancer"'`
+2. Confirm sink destination and writer identity:
+	- `gcloud logging sinks describe export-to-bq --project=PROJECT_ID --format='table(name,destination,writerIdentity)'`
+
+## 6) Run BigQuery analysis queries
+1. Open `docs/bigquery-queries.sql` and run each query in BigQuery console.
+2. Confirm date-sharded tables exist in `PROJECT_ID.logs_dataset_us`:
+	- `bq ls --project_id=PROJECT_ID logs_dataset_us`
+
+## 7) Import Grafana dashboard and capture screenshot
+1. In Grafana, add BigQuery datasource.
+2. Import `grafana/dashboard.json`.
+3. Set template constants:
+	- `project = PROJECT_ID`
+	- `dataset = logs_dataset_us`
+4. Capture dashboard screenshot for evidence.
+
+## 8) Cleanup
+1. Delete Kubernetes resources:
+	- `kubectl delete -f k8s/ingress.yaml --ignore-not-found`
+	- `kubectl delete -f k8s/webapp-a-hpa.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-deployment.yaml --ignore-not-found`
+	- `kubectl delete -f k8s/webapp-b-service.yaml -f k8s/webapp-b-deployment.yaml --ignore-not-found`
+	- `kubectl delete -f k8s/webapp-serviceaccount.yaml --ignore-not-found`
+2. Destroy infra:
+	- `cd terraform`
+	- `terraform destroy -var="project_id=PROJECT_ID" -var="region=us-central1" -auto-approve`

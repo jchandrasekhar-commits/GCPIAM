@@ -1,15 +1,265 @@
 {
-  "dashboard": {
-    "id": null,
-    "uid": null,
-    "title": "GKE Observability - Quick",
-    "panels": [
-      { "type": "timeseries", "title": "Error Rate", "gridPos": {"h":6,"w":12,"x":0,"y":0} },
-      { "type": "timeseries", "title": "Pod Restarts", "gridPos": {"h":6,"w":12,"x":12,"y":0} },
-      { "type": "timeseries", "title": "Latency (p50/p95/p99)", "gridPos": {"h":6,"w":12,"x":0,"y":6} },
-      { "type": "timeseries", "title": "CPU / Memory Trends", "gridPos": {"h":6,"w":12,"x":12,"y":6} }
-    ],
-    "schemaVersion": 36,
-    "version": 0
-  }
+  "__inputs": [
+    {
+      "name": "DS_BQ",
+      "label": "BigQuery",
+      "description": "Grafana BigQuery datasource",
+      "type": "datasource",
+      "pluginId": "grafana-bigquery-datasource",
+      "pluginName": "BigQuery"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY') OR logName LIKE '%stderr%', 1, 0) AS is_error\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  namespace AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Application Error Rate by Namespace (%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.events_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND COALESCE(jsonPayload.reason, '') IN ('BackOff','Killing','Started','Unhealthy')\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Pod Restart/Instability Events by Namespace",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    CAST(JSON_VALUE(httpRequest, '$.latency') AS STRING) AS latency_str\n  FROM `${project}.${dataset}.requests_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n), parsed AS (\n  SELECT\n    time,\n    SAFE_CAST(REGEXP_REPLACE(latency_str, r's$', '') AS FLOAT64) * 1000 AS latency_ms\n  FROM latency\n  WHERE latency_str IS NOT NULL\n), q AS (\n  SELECT\n    time,\n    APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM parsed\n  GROUP BY time\n)\nSELECT time, 'p50' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL\nSELECT time, 'p95' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL\nSELECT time, 'p99' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Request Latency p50/p95/p99 (ms)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  CASE\n    WHEN logName LIKE '%stdout%' THEN 'stdout_lines'\n    WHEN logName LIKE '%stderr%' THEN 'stderr_lines'\n    ELSE 'events'\n  END AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.events_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Resource/Activity Utilization Trend (log activity proxy)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "gke",
+    "bigquery",
+    "observability"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "PROJECT_ID",
+          "value": "PROJECT_ID"
+        },
+        "hide": 0,
+        "label": "project",
+        "name": "project",
+        "options": [
+          {
+            "selected": true,
+            "text": "PROJECT_ID",
+            "value": "PROJECT_ID"
+          }
+        ],
+        "query": "PROJECT_ID",
+        "skipUrlSync": false,
+        "type": "constant"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "logs_dataset_us",
+          "value": "logs_dataset_us"
+        },
+        "hide": 0,
+        "label": "dataset",
+        "name": "dataset",
+        "options": [
+          {
+            "selected": true,
+            "text": "logs_dataset_us",
+            "value": "logs_dataset_us"
+          }
+        ],
+        "query": "logs_dataset_us",
+        "skipUrlSync": false,
+        "type": "constant"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "GKE Logs and Request Observability",
+  "uid": "gke-observability-bq",
+  "version": 1,
+  "weekStart": ""
 }

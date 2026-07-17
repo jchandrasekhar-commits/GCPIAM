@@ -9,5 +9,5 @@ variable "region" {
 
 variable "bq_dataset" {
   type    = string
-  default = "logs_dataset"
+  default = "logs_dataset_us"
 }

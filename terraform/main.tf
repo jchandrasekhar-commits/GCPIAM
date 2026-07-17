@@ -63,7 +63,8 @@ resource "google_service_account" "cicd" {
 
 resource "google_bigquery_dataset" "logs" {
   dataset_id = var.bq_dataset
-  location   = "us-central1"
+  # Use multi-region US to avoid Cloud Logging->BigQuery table_invalid_schema issues seen with regional datasets.
+  location   = "US"
 }
 
 resource "google_logging_project_sink" "to_bq" {
