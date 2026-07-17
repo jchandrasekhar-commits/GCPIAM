@@ -41,10 +41,11 @@ resource "google_project_iam_binding" "ops_network_admin" {
   members = local.ops_principals
 }
 
-resource "google_bigquery_dataset_iam_binding" "ops_data_owner" {
+resource "google_bigquery_dataset_iam_member" "ops_data_owner" {
+  for_each   = toset(local.ops_principals)
   dataset_id = google_bigquery_dataset.logs.dataset_id
   role       = "roles/bigquery.dataOwner"
-  members    = local.ops_principals
+  member     = each.value
 }
 
 resource "google_project_iam_binding" "ops_logging_config_writer" {
@@ -77,10 +78,11 @@ resource "google_project_iam_binding" "sre_cluster_viewer" {
   members = local.sre_principals
 }
 
-resource "google_bigquery_dataset_iam_binding" "sre_data_viewer" {
+resource "google_bigquery_dataset_iam_member" "sre_data_viewer" {
+  for_each   = toset(local.sre_principals)
   dataset_id = google_bigquery_dataset.logs.dataset_id
   role       = "roles/bigquery.dataViewer"
-  members    = local.sre_principals
+  member     = each.value
 }
 
 resource "google_project_iam_binding" "cicd_cloudbuild_builder" {

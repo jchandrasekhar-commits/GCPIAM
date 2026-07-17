@@ -49,6 +49,13 @@ resource "google_container_node_pool" "default_pool" {
     auto_repair  = true
     auto_upgrade = true
   }
+
+  lifecycle {
+    ignore_changes = [
+      node_config[0].resource_labels,
+      node_config[0].kubelet_config,
+    ]
+  }
 }
 
 resource "google_service_account" "app_service" {
@@ -70,7 +77,7 @@ resource "google_bigquery_dataset" "logs" {
 resource "google_logging_project_sink" "to_bq" {
   name                   = "export-to-bq"
   destination            = "bigquery.googleapis.com/projects/${var.project_id}/datasets/${google_bigquery_dataset.logs.dataset_id}"
-  filter                 = "resource.type=\"k8s_container\""
+  filter                 = "resource.type=\"k8s_container\" OR resource.type=\"http_load_balancer\""
   unique_writer_identity = true
 }
 
