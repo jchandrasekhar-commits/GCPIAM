@@ -1,7 +1,7 @@
 locals {
-  dev_principals  = [var.dev_principal]
-  ops_principals  = [var.ops_principal]
-  sre_principals  = [var.sre_principal]
+  dev_principals  = var.dev_principals
+  ops_principals  = var.ops_principals
+  sre_principals  = var.sre_principals
   cicd_principals = ["serviceAccount:${google_service_account.cicd.email}"]
 }
 

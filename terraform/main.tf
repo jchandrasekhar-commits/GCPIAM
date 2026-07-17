@@ -18,23 +18,37 @@ resource "google_container_cluster" "primary" {
   name                     = "gke-primary"
   location                 = var.region
   network                  = google_compute_network.vpc.name
-  remove_default_node_pool = true
+  subnetwork               = google_compute_subnetwork.primary_subnet.name
+  remove_default_node_pool = false
   initial_node_count       = 1
-  node_locations           = ["us-central1-a", "us-central1-b", "us-central1-e"]
+  node_locations           = ["us-central1-a", "us-central1-b"]
   ip_allocation_policy {}
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 }
 
-resource "google_container_node_pool" "primary_pool" {
-  name       = "primary-pool"
-  cluster    = google_container_cluster.primary.name
-  node_count = 3
+resource "google_container_node_pool" "default_pool" {
+  name           = "default-pool"
+  cluster        = google_container_cluster.primary.name
+  location       = var.region
+  node_locations = ["us-central1-a", "us-central1-b"]
+
+  autoscaling {
+    min_node_count = 0
+    max_node_count = 1
+  }
+
   node_config {
     machine_type = "e2-small"
+    disk_type    = "pd-standard"
+    disk_size_gb = 30
   }
-  node_locations = ["us-central1-a", "us-central1-b", "us-central1-e"]
+
+  management {
+    auto_repair  = true
+    auto_upgrade = true
+  }
 }
 
 resource "google_service_account" "app_service" {
@@ -49,7 +63,7 @@ resource "google_service_account" "cicd" {
 
 resource "google_bigquery_dataset" "logs" {
   dataset_id = var.bq_dataset
-  location   = "US"
+  location   = "us-central1"
 }
 
 resource "google_logging_project_sink" "to_bq" {
