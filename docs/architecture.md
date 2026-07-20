@@ -1,7 +1,7 @@
 # GKE DevOps Architecture
 
 ## Overview
-This design uses a single primary GKE Standard cluster and keeps a secondary cluster as optional (design-only) for free-tier awareness. Traffic enters through DNS and a global HTTP(S) load balancer, reaches GKE ingress, and is routed to two application services.
+This design uses a primary GKE Standard cluster (`gke-primary`, `us-central1`) plus a symmetric secondary cluster (`gke-secondary`, `us-east1`) for multi-region high availability. The secondary is defined in Terraform and provisioned on demand via the `enable_secondary` variable (default `false` to stay within the free tier). Traffic enters through DNS and a global HTTP(S) load balancer, reaches GKE ingress, and is routed to two application services.
 
 ## Mermaid Diagram
 ```mermaid
@@ -19,7 +19,7 @@ flowchart LR
     ING --> SB --> PB
   end
 
-  subgraph GKE_SECONDARY["Optional Secondary Cluster (Design Only)"]
+  subgraph GKE_SECONDARY["GKE Cluster: gke-secondary (us-east1, enable_secondary)"]
     ING2[Ingress]
     S2[Services]
     P2[Pods]

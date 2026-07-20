@@ -14,3 +14,8 @@ output "bq_dataset" {
 output "cicd_service_account_email" {
   value = google_service_account.cicd.email
 }
+
+output "app_secret_name" {
+  value       = google_secret_manager_secret.app_secret.secret_id
+  description = "Secret Manager secret consumed by the app via Workload Identity."
+}

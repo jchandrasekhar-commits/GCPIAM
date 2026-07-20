@@ -1,0 +1,34 @@
+# Copy to terraform.tfvars and fill in real values, then run:
+#   terraform apply
+# Do NOT commit a real terraform.tfvars containing secrets.
+
+# --- Required ---------------------------------------------------------------
+project_id = "project-80744ff2-3e39-47f5-a73"
+region     = "us-central1"
+
+# --- BigQuery ---------------------------------------------------------------
+bq_dataset = "logs_dataset_us"
+
+# --- Secret Manager (override; do not commit real secrets) ------------------
+# app_secret_value = "your-real-secret"
+
+# --- Secondary (DR) cluster: off by default to stay in the free tier --------
+enable_secondary         = false
+secondary_region         = "us-east1"
+secondary_node_locations = ["us-east1-b", "us-east1-c"]
+secondary_subnet_cidr    = "10.20.0.0/20"
+
+# --- Private cluster hardening ----------------------------------------------
+enable_private_nodes = true
+# Restrict control-plane access to your admin IP in production, e.g.:
+# master_authorized_cidrs = [
+#   { cidr_block = "203.0.113.10/32", display_name = "admin-laptop" }
+# ]
+master_authorized_cidrs = [
+  { cidr_block = "0.0.0.0/0", display_name = "all (demo - tighten for prod)" }
+]
+
+# --- IAM principals (defaults point at the repo owner) ----------------------
+# dev_principals  = ["user:you@example.com"]
+# ops_principals  = ["group:ops@example.com"]
+# sre_principals  = ["group:sre@example.com"]

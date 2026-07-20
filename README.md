@@ -4,10 +4,10 @@ This workspace contains a scaffold for a GCP project with two GKE clusters, two 
 
 What I added:
 - `gcp_end_to_end_writeup.md` — architecture and commands
-- `terraform/` — Terraform skeleton (VPC, GKE primary cluster, BigQuery dataset, logging sink)
-- `k8s/` — Kubernetes manifests for `webapp-a` and `webapp-b` and an HPA
+- `terraform/` — Terraform for VPC, Cloud NAT, firewall rules, GKE primary cluster, optional symmetric secondary cluster (`enable_secondary`), IAM, BigQuery dataset, and logging sink
+- `k8s/` — Kubernetes manifests for `webapp-a` and `webapp-b`, HPAs for both, a ConfigMap/Secret, and an ingress
 - `cloudbuild.yaml` — sample CI to build/push and deploy `webapp-a`
-- `grafana/dashboard.json` — skeleton Grafana dashboard
+- `grafana/dashboard.json` — Grafana dashboard with 4 BigQuery-backed panels
 
 Quick start checklist (local):
 
@@ -26,6 +26,10 @@ cd terraform
 terraform init
 terraform apply -var='project_id=<PROJECT_ID>' -var='region=us-central1'
 ```
+
+To also provision the symmetric secondary (DR) cluster, add `-var='enable_secondary=true'`
+(defaults: `secondary_region=us-east1`, `secondary_subnet_cidr=10.20.0.0/20`). It is off by
+default to stay within the free tier.
 
 3. Configure kubectl for the created cluster:
 
@@ -64,15 +68,15 @@ Learning notes (next actions):
 A repo memory bank has been created at `/memories/repo/memory_bank.md` to capture key changes, troubleshooting findings, and infrastructure state.
 
 ## Recent Changes
-- Updated Terraform to retry GKE provisioning in alternate zones: `us-central1-a`, `us-central1-b`, and `us-central1-e`.
-- Added enterprise Workload Identity support for app workloads and logging/metrics IAM bindings.
+- Added Cloud NAT (per region) and VPC firewall rules for internal + health-check traffic.
+- Expanded Terraform into a multi-cluster setup: symmetric secondary cluster via `enable_secondary`.
+- Added HPAs for both apps and a ConfigMap/Secret consumed by `webapp-a`.
+- Added Secret Manager secret (`webapp-api-token`) consumed via Workload Identity (`secretAccessor`).
+- Hardened clusters with private nodes (`enable_private_nodes`) and master authorized networks.
+- Added readiness/liveness probes, preStop hooks, and PodDisruptionBudgets for zero-downtime rollouts.
+- Added `terraform/terraform.tfvars.example` documenting all input variables.
+- Completed the Grafana dashboard with 4 BigQuery-backed panels.
 - Documented the logging sink/BigQuery dataset mismatch and the fix to use a `US` location dataset.
-If you want, I'll now:
-1) Expand the Terraform into a multi-cluster (add secondary) and parameterize node pools, or
-2) Generate a complete Grafana JSON with embedded BigQuery queries, or
-3) Walk through each step interactively and run commands with you.
-
-Tell me which option to do next.
 
 ---
 

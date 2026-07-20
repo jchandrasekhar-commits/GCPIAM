@@ -1,0 +1,23 @@
+# PodDisruptionBudgets keep at least one pod of each app serving during
+# voluntary disruptions (node drains, cluster upgrades, autoscaler events).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: webapp-a-pdb
+  namespace: default
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: webapp-a
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: webapp-b-pdb
+  namespace: default
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: webapp-b

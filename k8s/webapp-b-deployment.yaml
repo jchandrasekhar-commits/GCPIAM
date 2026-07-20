@@ -16,11 +16,30 @@ spec:
     spec:
       serviceAccountName: webapp-ksa
       automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
       containers:
       - name: webapp-b
         image: gcr.io/google-samples/hello-app:1.0
         ports:
         - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]
         resources:
           requests:
             cpu: "50m"

@@ -1,0 +1,24 @@
+# Non-secret application configuration for the web apps.
+# Demonstrates the "config stored in ConfigMaps" requirement. Injected into the
+# webapp-a container via envFrom (see k8s/webapp-a-deployment.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-config
+  namespace: default
+data:
+  APP_ENV: "assignment"
+  APP_REGION: "us-central1"
+  LOG_LEVEL: "info"
+  FEATURE_GREETING: "Hello from webapp via ConfigMap"
+---
+# Example Secret for sensitive config (placeholder values only; real secrets
+# should come from Secret Manager via Workload Identity, not committed here).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webapp-secret
+  namespace: default
+type: Opaque
+stringData:
+  API_TOKEN: "replace-me-via-secret-manager"

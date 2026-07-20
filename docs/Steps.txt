@@ -10,7 +10,7 @@ setx BROWSER "C:\Program Files\Google\Chrome\Application\chrome.exe"
 gcloud auth login
 
 gcloud config set project project-80744ff2-3e39-47f5-a73
-gcloud services enable container.googleapis.com bigquery.googleapis.com logging.googleapis.com compute.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
+gcloud services enable container.googleapis.com bigquery.googleapis.com logging.googleapis.com compute.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com secretmanager.googleapis.com
 gcloud components install kubectl -q
 
 ---
@@ -150,8 +150,10 @@ roles/logging.serviceAgent  serviceAccount:service-11856948072@gcp-sa-logging.ia
 ## 2) Deploy both apps and HPAs
 1. Apply workload/service manifests:
 	- `kubectl apply -f k8s/webapp-serviceaccount.yaml`
+	- `kubectl apply -f k8s/webapp-config.yaml`
 	- `kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml`
-	- `kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml`
+	- `kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml -f k8s/webapp-b-hpa.yaml`
+	- `kubectl apply -f k8s/pdb.yaml`
 2. Validate rollouts:
 	- `kubectl rollout status deployment/webapp-a -n default`
 	- `kubectl rollout status deployment/webapp-b -n default`
@@ -193,12 +195,29 @@ roles/logging.serviceAgent  serviceAccount:service-11856948072@gcp-sa-logging.ia
 	- `dataset = logs_dataset_us`
 4. Capture dashboard screenshot for evidence.
 
-## 8) Cleanup
-1. Delete Kubernetes resources:
+## 8) Optional: enable and deploy to the secondary (DR) cluster
+The secondary cluster is defined in Terraform but disabled by default to stay
+within the free tier. Enable it only when demonstrating multi-region HA.
+1. Apply with the secondary toggle on (defaults: region `us-east1`, subnet `10.20.0.0/20`):
+	- `cd terraform`
+	- `terraform apply -var="project_id=PROJECT_ID" -var="region=us-central1" -var="enable_secondary=true" -auto-approve`
+	- `cd ..`
+2. Get credentials for the secondary cluster:
+	- `gcloud container clusters get-credentials gke-secondary --region us-east1 --project PROJECT_ID`
+3. Deploy the same workloads to the secondary context:
+	- `kubectl apply -f k8s/webapp-serviceaccount.yaml`
+	- `kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml`
+	- `kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml`
+4. Validate:
+	- `kubectl config get-contexts`
+	- `kubectl get deploy,svc,hpa -n default`
+
+## 9) Cleanup
+1. Delete Kubernetes resources (repeat per cluster context if secondary was enabled):
 	- `kubectl delete -f k8s/ingress.yaml --ignore-not-found`
 	- `kubectl delete -f k8s/webapp-a-hpa.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-deployment.yaml --ignore-not-found`
 	- `kubectl delete -f k8s/webapp-b-service.yaml -f k8s/webapp-b-deployment.yaml --ignore-not-found`
 	- `kubectl delete -f k8s/webapp-serviceaccount.yaml --ignore-not-found`
-2. Destroy infra:
+2. Destroy infra (include `enable_secondary=true` if it was enabled, so the secondary is also removed):
 	- `cd terraform`
-	- `terraform destroy -var="project_id=PROJECT_ID" -var="region=us-central1" -auto-approve`
+	- `terraform destroy -var="project_id=PROJECT_ID" -var="region=us-central1" -var="enable_secondary=true" -auto-approve`
