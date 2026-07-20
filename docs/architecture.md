@@ -7,7 +7,7 @@ This design uses a single primary GKE Standard cluster and keeps a secondary clu
 ```mermaid
 flowchart LR
   U[Customer] --> DNS[Cloud DNS]
-  DNS --> GLB[Global HTTP(S) Load Balancer]
+  DNS --> GLB["Global HTTP(S) Load Balancer"]
   GLB --> ING[GKE Ingress]
 
   subgraph GKE_PRIMARY["GKE Cluster: gke-primary"]
