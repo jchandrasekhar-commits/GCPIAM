@@ -107,3 +107,51 @@ Recommended quick fixes:
 
 If you want, I can run these fixes now and update Terraform to keep IaC consistent.
 
+---
+
+## GKE Health Recommendations Checklist
+
+Use this loop weekly (or before releases) to keep performance and reliability aligned with GKE best practices.
+
+1) Cluster and node health
+- Check node readiness and version skew:
+	- `kubectl get nodes -o wide`
+- Check pending/failed workloads:
+	- `kubectl get pods -A --field-selector=status.phase!=Running`
+- Investigate scheduling pressure quickly:
+	- `kubectl describe pod <POD_NAME> -n <NAMESPACE>`
+
+2) Capacity and autoscaling
+- Verify HPA targets are healthy and scaling correctly:
+	- `kubectl get hpa -A`
+- Verify requests/limits are set for every app deployment.
+- Watch for autoscaler "unhelpable" events and right-size workloads.
+
+3) Reliability guardrails
+- Keep readiness/liveness probes on all app containers.
+- Keep PodDisruptionBudgets for critical services.
+- Confirm rolling update behavior during deploys:
+	- `kubectl rollout status deployment/<NAME> -n <NAMESPACE>`
+
+4) Security and access posture
+- Use Workload Identity mappings instead of static credentials.
+- Keep secret access through Secret Manager IAM roles.
+- Restrict control-plane access CIDRs in production (`master_authorized_cidrs`).
+
+5) Observability completeness
+- Confirm sink routing includes both workload and LB logs:
+	- `resource.type="k8s_container" OR resource.type="http_load_balancer"`
+- Verify sink destination and writer identity:
+	- `gcloud logging sinks describe export-to-bq --project=<PROJECT_ID> --format="table(name,destination,writerIdentity)"`
+- Validate dashboard signal coverage (error rate, restarts, latency, utilization).
+
+6) Validation loop after every infra/app change
+- Terraform static check:
+	- `terraform validate`
+- Runtime health snapshot:
+	- `kubectl get deploy,hpa,pdb,ingress -n default -o wide`
+	- `kubectl get svc webapp-a webapp-b -n default -o wide`
+- Endpoint smoke tests:
+	- `curl.exe -sS -m 10 http://<WEBAPP_A_EXTERNAL_IP>`
+	- `curl.exe -sS -m 10 http://<WEBAPP_B_EXTERNAL_IP>`
+
