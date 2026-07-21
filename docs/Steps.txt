@@ -221,3 +221,41 @@ within the free tier. Enable it only when demonstrating multi-region HA.
 2. Destroy infra (include `enable_secondary=true` if it was enabled, so the secondary is also removed):
 	- `cd terraform`
 	- `terraform destroy -var="project_id=PROJECT_ID" -var="region=us-central1" -var="enable_secondary=true" -auto-approve`
+
+## 10) Helm-based Grafana/Prometheus deployment and screenshot capture
+1. Deploy observability stack:
+	- `helm repo add prometheus-community https://prometheus-community.github.io/helm-charts`
+	- `helm repo add grafana https://grafana.github.io/helm-charts`
+	- `helm repo update`
+	- `kubectl create namespace monitoring`
+	- `helm upgrade --install kube-prom-stack prometheus-community/kube-prometheus-stack --namespace monitoring --set grafana.enabled=false`
+	- `helm upgrade --install grafana grafana/grafana --namespace monitoring --set service.type=LoadBalancer --set adminPassword='Admin123!' --set plugins[0]=grafana-bigquery-datasource`
+2. Wait for readiness:
+	- `kubectl get pods -n monitoring -o wide`
+	- `kubectl get svc --namespace monitoring -w grafana`
+3. Fetch login credentials:
+	- `kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo`
+	- Username: `admin`
+4. Open Grafana:
+	- `http://<GRAFANA_EXTERNAL_IP>`
+5. In Grafana UI:
+	- Add BigQuery datasource
+	- Import `grafana/dashboard.json`
+	- Set variables `project=project-80744ff2-3e39-47f5-a73`, `dataset=logs_dataset_us`
+6. Capture evidence:
+	- Full dashboard screenshot showing all four required panels
+	- Optional extra screenshot of one panel query/editor view
+
+## 11) Dashboard JSON compatibility notes
+1. Grafana import path:
+	- Use `grafana/dashboard.json` only.
+	- Import from Grafana UI (`Dashboards -> Import`).
+2. Cloud Monitoring create path:
+	- Use `grafana/dashboard-cloud-monitoring.json` only.
+	- Create via CLI:
+		- `gcloud monitoring dashboards create --config-from-file=grafana/dashboard-cloud-monitoring.json --project=project-80744ff2-3e39-47f5-a73`
+3. Expected errors when mixed:
+	- Importing `dashboard-cloud-monitoring.json` into Grafana: `Unable to recognize JSON as a Grafana Dashboard...`
+	- Uploading `dashboard.json` through Cloud Monitoring converter: template-variable and panel-target conversion warnings.
+4. Open created Cloud Monitoring dashboard (current ID):
+	- `https://console.cloud.google.com/monitoring/dashboards/custom/ba5be944-8bbf-44fe-89ed-65946f67aa68?project=project-80744ff2-3e39-47f5-a73`

@@ -8,6 +8,7 @@ What I added:
 - `k8s/` — Kubernetes manifests for `webapp-a` and `webapp-b`, HPAs for both, a ConfigMap/Secret, and an ingress
 - `cloudbuild.yaml` — sample CI to build/push and deploy `webapp-a`
 - `grafana/dashboard.json` — Grafana dashboard with 4 BigQuery-backed panels
+- `grafana/dashboard-cloud-monitoring.json` — native Cloud Monitoring dashboard JSON (not for Grafana import)
 
 Quick start checklist (local):
 
@@ -106,6 +107,73 @@ Recommended quick fixes:
 - Recreate the sink pointing to an existing multi-region dataset.
 
 If you want, I can run these fixes now and update Terraform to keep IaC consistent.
+
+---
+
+## Helm Observability Setup (Completed)
+
+Prometheus and Grafana were deployed in the `monitoring` namespace using Helm.
+
+```powershell
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+kubectl create namespace monitoring
+
+helm upgrade --install kube-prom-stack prometheus-community/kube-prometheus-stack \
+	--namespace monitoring \
+	--set grafana.enabled=false
+
+helm upgrade --install grafana grafana/grafana \
+	--namespace monitoring \
+	--set service.type=LoadBalancer \
+	--set adminPassword='Admin123!' \
+	--set plugins[0]=grafana-bigquery-datasource
+```
+
+Quick checks:
+
+```powershell
+kubectl get pods -n monitoring -o wide
+kubectl get svc -n monitoring -o wide
+kubectl get svc --namespace monitoring -w grafana
+```
+
+Fetch Grafana admin password from cluster secret:
+
+```powershell
+kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+```
+
+Once Grafana is running and the LoadBalancer IP is assigned, open `http://<GRAFANA_EXTERNAL_IP>` and sign in with `admin` plus the password command above.
+
+### Dashboard Import and Screenshot Steps
+
+1. Open Grafana UI.
+2. Add BigQuery datasource.
+3. Import dashboard JSON from `grafana/dashboard.json`.
+4. Set constants:
+	 - `project = project-80744ff2-3e39-47f5-a73`
+	 - `dataset = logs_dataset_us`
+5. Ensure panels show data.
+6. Capture a screenshot with all 4 panels visible.
+
+### Dashboard File Compatibility
+
+- Use `grafana/dashboard.json` only in Grafana (`Dashboards -> Import`).
+- Use `grafana/dashboard-cloud-monitoring.json` only with Cloud Monitoring API/CLI.
+- If you try to import `grafana/dashboard-cloud-monitoring.json` into Grafana, you will get:
+	- `Unable to recognize JSON as a Grafana Dashboard...`
+- If you try to upload `grafana/dashboard.json` to Cloud Monitoring converter, you may get conversion warnings for unsupported Grafana template variables and panel targets.
+
+Cloud Monitoring create command:
+
+```powershell
+gcloud monitoring dashboards create --config-from-file=grafana/dashboard-cloud-monitoring.json --project=project-80744ff2-3e39-47f5-a73
+```
+
+Created dashboard link (current):
+- `https://console.cloud.google.com/monitoring/dashboards/custom/ba5be944-8bbf-44fe-89ed-65946f67aa68?project=project-80744ff2-3e39-47f5-a73`
 
 ---
 

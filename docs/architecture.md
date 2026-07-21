@@ -53,6 +53,18 @@ flowchart LR
 3. Grafana queries BigQuery date-sharded tables (`stdout_*`, `stderr_*`, `events_*`, `requests_*`).
 4. Dashboard panels visualize error rate, restart signals, latency percentiles, and activity trend.
 
+## Dashboard Artifacts And Access
+1. Grafana dashboard JSON: `grafana/dashboard.json`
+  - Import path: Grafana UI -> Dashboards -> Import.
+2. Cloud Monitoring dashboard JSON: `grafana/dashboard-cloud-monitoring.json`
+  - Create path: `gcloud monitoring dashboards create --config-from-file=grafana/dashboard-cloud-monitoring.json --project=project-80744ff2-3e39-47f5-a73`
+3. Current Cloud Monitoring dashboard URL:
+  - `https://console.cloud.google.com/monitoring/dashboards/custom/ba5be944-8bbf-44fe-89ed-65946f67aa68?project=project-80744ff2-3e39-47f5-a73`
+4. Current Grafana URL:
+  - `http://136.64.53.196`
+
+Note: The two JSON formats are not interchangeable. Importing the Cloud Monitoring JSON into Grafana, or uploading the Grafana JSON through Cloud Monitoring conversion, results in schema/conversion errors.
+
 ## Troubleshooting: `table_invalid_schema`
 
 ### Symptom
