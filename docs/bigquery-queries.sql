@@ -12,7 +12,19 @@ WITH app_logs AS (
   SELECT
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS minute_ts,
     COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
-    IF(severity IN ('ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY') OR logName LIKE '%stderr%', 1, 0) AS is_error
+    severity,
+    'stdout' AS stream
+  FROM `PROJECT_ID.logs_dataset_us.stdout_*`
+  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
+    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
+
+  UNION ALL
+
+  SELECT
+    TIMESTAMP_TRUNC(timestamp, MINUTE) AS minute_ts,
+    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
+    severity,
+    'stderr' AS stream
   FROM `PROJECT_ID.logs_dataset_us.stderr_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
@@ -20,31 +32,33 @@ WITH app_logs AS (
 SELECT
   minute_ts AS time,
   namespace,
-  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS error_rate_pct
+  SAFE_DIVIDE(
+    SUM(IF(severity IN ('ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY') OR stream = 'stderr', 1, 0)),
+    COUNT(1)
+  ) * 100 AS error_rate_pct
 FROM app_logs
 GROUP BY time, namespace
 ORDER BY time;
 
 
 -- 2) Pod restart-related event counts by namespace
+-- This deployment does not export Kubernetes event logs to BigQuery.
+-- Configure a Logging sink for resource.type=("k8s_pod" OR "k8s_cluster")
+-- before replacing this diagnostic query with an events_* query.
 SELECT
-  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
-  COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
-  COALESCE(jsonPayload.reason, 'unknown') AS reason,
-  COUNT(1) AS event_count
-FROM `PROJECT_ID.logs_dataset_us.events_*`
-WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
-  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
-  AND COALESCE(jsonPayload.reason, '') IN ('BackOff', 'Killing', 'Started', 'Unhealthy')
-GROUP BY time, namespace, reason
-ORDER BY time;
+  CAST(NULL AS TIMESTAMP) AS time,
+  CAST(NULL AS STRING) AS namespace,
+  'events_not_exported' AS reason,
+  0 AS event_count
+FROM UNNEST([STRUCT(1 AS placeholder)])
+WHERE FALSE;
 
 
 -- 3) Request latency p50/p95/p99 (ms)
 WITH lb_requests AS (
   SELECT
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS minute_ts,
-    CAST(JSON_VALUE(httpRequest, '$.latency') AS STRING) AS latency_str
+    CAST(httpRequest.latency AS STRING) AS latency_str
   FROM `PROJECT_ID.logs_dataset_us.requests_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
@@ -72,14 +86,22 @@ ORDER BY time;
 -- 4) Resource/activity utilization trend proxy from log volume
 SELECT
   TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
-  CASE
-    WHEN logName LIKE '%stdout%' THEN 'stdout_lines'
-    WHEN logName LIKE '%stderr%' THEN 'stderr_lines'
-    ELSE 'events'
-  END AS signal,
+  'stdout_lines' AS signal,
   COUNT(1) AS volume
 FROM `PROJECT_ID.logs_dataset_us.stdout_*`
 WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
   AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
-GROUP BY time, signal
+GROUP BY time
+
+UNION ALL
+
+SELECT
+  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
+  'stderr_lines' AS signal,
+  COUNT(1) AS volume
+FROM `PROJECT_ID.logs_dataset_us.stderr_*`
+WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
+  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
+GROUP BY time
+
 ORDER BY time;
