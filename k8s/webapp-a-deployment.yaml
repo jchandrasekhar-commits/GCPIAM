@@ -25,8 +25,6 @@ spec:
         envFrom:
         - configMapRef:
             name: webapp-config
-        - secretRef:
-            name: webapp-secret
         readinessProbe:
           httpGet:
             path: /
@@ -52,3 +50,14 @@ spec:
           limits:
             cpu: "500m"
             memory: "256Mi"
+        volumeMounts:
+        - mountPath: "/mnt/secrets-store"
+          name: secrets-store-inline
+          readOnly: true
+      volumes:
+      - name: secrets-store-inline
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: "gcp-secrets-provider"
