@@ -4,8 +4,8 @@ This workspace contains a scaffold for a GCP project with two GKE clusters, two 
 
 What I added:
 - `gcp_end_to_end_writeup.md` — architecture and commands
-- `terraform/` — Terraform for VPC, Cloud NAT, firewall rules, GKE primary cluster, optional symmetric secondary cluster (`enable_secondary`), IAM, BigQuery dataset, and logging sink
-- `k8s/` — Kubernetes manifests for `webapp-a` and `webapp-b`, HPAs for both, a ConfigMap/Secret, and an ingress
+- `terraform/` — Terraform for a custom-mode VPC, **segregated subnets** (GKE + alias ranges, `lb-proxy-subnet`, `ops-subnet`), **Private Service Access**, Cloud NAT, firewall rules, GKE primary cluster (Managed Prometheus, Binary Authorization), optional symmetric secondary cluster (`enable_secondary`), IAM, BigQuery dataset, logging sink, **global HTTPS load balancer static IP**, **Cloud Armor WAF**, **Cloud DNS**, and **uptime check + alerting**
+- `k8s/` — manifests for `webapp-a`/`webapp-b`, HPAs, ConfigMap/Secret, an Ingress plus **BackendConfig (Cloud Armor + NEG health check)**, **FrontendConfig (HTTP→HTTPS)**, and **ManagedCertificate** for the global external HTTPS load balancer
 - `cloudbuild.yaml` — sample CI to build/push and deploy `webapp-a`
 - `grafana/dashboard.json` — Grafana dashboard with 4 BigQuery-backed panels
 - `grafana/dashboard-cloud-monitoring.json` — native Cloud Monitoring dashboard JSON (not for Grafana import)
@@ -50,6 +50,21 @@ kubectl port-forward svc/webapp-a 8080:80
 # open http://localhost:8080
 ```
 
+5. Expose the apps through the global external HTTPS load balancer (Cloud Armor + managed TLS):
+
+```powershell
+# Edit k8s/managedcertificate.yaml and k8s/ingress.yaml to your real hostname first,
+# then set terraform vars: -var='enable_cloud_dns=true' -var='dns_domain=yourapp.com.' -var='app_hostname=app.yourapp.com'
+kubectl apply -f ../k8s/backendconfig.yaml
+kubectl apply -f ../k8s/frontendconfig.yaml
+kubectl apply -f ../k8s/managedcertificate.yaml
+kubectl apply -f ../k8s/webapp-a-service.yaml
+kubectl apply -f ../k8s/webapp-b-service.yaml
+kubectl apply -f ../k8s/ingress.yaml
+# Point your DNS A record at the reserved IP:
+terraform -chdir=../terraform output lb_static_ip
+```
+
 ## IAM Roles
 This repo includes role mappings for Dev, Ops, SRE, and CI/CD access.
 
@@ -70,7 +85,10 @@ A repo memory bank has been created at `/memories/repo/memory_bank.md` to captur
 
 ## Recent Changes
 - Added Cloud NAT (per region) and VPC firewall rules for internal + health-check traffic.
-- Expanded Terraform into a multi-cluster setup: symmetric secondary cluster via `enable_secondary`.
+- Converted to a custom-mode VPC with segregated subnets: `gke-primary-subnet` (+ pods/services alias ranges), `lb-proxy-subnet` (REGIONAL_MANAGED_PROXY), and `ops-subnet`; added Private Service Access peering.
+- Added a global external HTTPS load balancer: reserved static IP, Google-managed TLS certificate, HTTP→HTTPS redirect (FrontendConfig), container-native NEG routing, and BackendConfig health checks.
+- Added Cloud Armor WAF (`webapps-waf`): OWASP SQLi/XSS rules, per-IP rate limiting, and adaptive L7 DDoS defense.
+- Added Cloud DNS managed zone + A record, Managed Prometheus, Binary Authorization (toggle), an uptime check + alert policy, and enabled Trace/Profiler/Error Reporting APIs.
 - Added HPAs for both apps and a ConfigMap/Secret consumed by `webapp-a`.
 - Added Secret Manager secret (`webapp-api-token`) consumed via Workload Identity (`secretAccessor`).
 - Hardened clusters with private nodes (`enable_private_nodes`) and master authorized networks.

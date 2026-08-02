@@ -1,0 +1,11 @@
+# FrontendConfig forces all HTTP traffic to redirect to HTTPS at the global
+# load balancer edge (SSL termination happens at the edge).
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: webapps-frontendconfig
+  namespace: default
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT

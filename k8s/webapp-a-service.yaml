@@ -2,6 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: webapp-a
+  annotations:
+    # Container-native load balancing: route the global LB straight to pods
+    # via a Network Endpoint Group (NEG) instead of through kube-proxy.
+    cloud.google.com/neg: '{"ingress": true}'
+    # Attach the BackendConfig (Cloud Armor WAF + health check).
+    cloud.google.com/backend-config: '{"default": "webapps-backendconfig"}'
 spec:
   selector:
     app: webapp-a
@@ -9,4 +15,5 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 8080
-  type: LoadBalancer
+  # GKE Ingress backends must be NodePort (or ClusterIP w/ NEG). NodePort here.
+  type: NodePort

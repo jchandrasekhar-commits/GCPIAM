@@ -61,3 +61,34 @@ variable "master_authorized_cidrs" {
   default     = [{ cidr_block = "0.0.0.0/0", display_name = "all (demo - tighten for prod)" }]
   description = "CIDRs allowed to reach the GKE control-plane API. Default is open for the demo; restrict to your admin IP in production."
 }
+
+# --- Load balancer / DNS / security ----------------------------------------
+variable "enable_binary_authorization" {
+  type        = bool
+  default     = false
+  description = "Enforce Binary Authorization (only attested images run). Off by default so the demo hello-app image still deploys."
+}
+
+variable "enable_cloud_dns" {
+  type        = bool
+  default     = false
+  description = "Create a Cloud DNS managed zone for the app domain. Off by default (requires an owned domain)."
+}
+
+variable "dns_domain" {
+  type        = string
+  default     = "example.com."
+  description = "Fully qualified DNS domain (trailing dot) for the managed zone, e.g. yourapp.com."
+}
+
+variable "app_hostname" {
+  type        = string
+  default     = "app.example.com"
+  description = "Hostname served by the global HTTPS load balancer / managed certificate."
+}
+
+variable "uptime_alert_email" {
+  type        = string
+  default     = ""
+  description = "Email address for the uptime-check alert notification channel. Leave empty to skip creating the channel."
+}

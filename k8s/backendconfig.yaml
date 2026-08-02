@@ -1,0 +1,21 @@
+# BackendConfig binds the global external HTTPS load balancer backend to the
+# Cloud Armor WAF policy (webapps-waf, created in terraform/loadbalancer.tf)
+# and defines the health check used to route only to healthy pods.
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: webapps-backendconfig
+  namespace: default
+spec:
+  securityPolicy:
+    name: webapps-waf
+  healthCheck:
+    type: HTTP
+    requestPath: /
+    port: 8080
+  # Connection draining for zero-downtime rollouts.
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+    sampleRate: 1.0

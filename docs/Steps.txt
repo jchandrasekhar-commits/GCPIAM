@@ -146,8 +146,16 @@ roles/logging.serviceAgent  serviceAccount:service-11856948072@gcp-sa-logging.ia
 	- `terraform init`
 	- `terraform plan -var="project_id=PROJECT_ID" -var="region=us-central1"`
 	- `terraform apply -var="project_id=PROJECT_ID" -var="region=us-central1" -auto-approve`
+	- **Note LB IP**: After apply, capture the output `lb_static_ip`.
 
-## 2) Deploy both apps and HPAs
+## 2) DNS and Certificates (Pre-deploy)
+1. If you own a domain (e.g., `yourapp.com`), update DNS:
+	- Add an A-Record for `app.yourapp.com` pointing to the `lb_static_ip`.
+2. Update the Kubernetes domain references:
+	- `k8s/managedcertificate.yaml`: Update `domains` to match `app.yourapp.com`
+	- `k8s/ingress.yaml`: Update `host` rule to match `app.yourapp.com`
+
+## 3) Deploy Applications and HPAs
 1. Apply workload/service manifests:
 	- `kubectl apply -f k8s/webapp-serviceaccount.yaml`
 	- `kubectl apply -f k8s/webapp-config.yaml`
@@ -159,22 +167,18 @@ roles/logging.serviceAgent  serviceAccount:service-11856948072@gcp-sa-logging.ia
 	- `kubectl rollout status deployment/webapp-b -n default`
 	- `kubectl get hpa -n default`
 
-## 3) Smoke-test LoadBalancer endpoint
-1. Get external IPs:
-	- `kubectl get svc webapp-a webapp-b -n default -o wide`
-2. Smoke test:
-	- `curl.exe -sS -m 10 http://<WEBAPP_A_EXTERNAL_IP>`
-	- `curl.exe -sS -m 10 http://<WEBAPP_B_EXTERNAL_IP>`
-
-## 4) Optional ingress path routing (NodePort patch)
-1. Patch service types to NodePort for GKE ingress backend compatibility:
-	- `kubectl patch svc webapp-a -n default -p '{"spec":{"type":"NodePort"}}'`
-	- `kubectl patch svc webapp-b -n default -p '{"spec":{"type":"NodePort"}}'`
-2. Apply ingress:
+## 4) Expose via Global external HTTPS load balancer
+1. Apply the Cloud Armor linkage, HTTPS redirects, and Certificates:
+	- `kubectl apply -f k8s/backendconfig.yaml`
+	- `kubectl apply -f k8s/frontendconfig.yaml`
+	- `kubectl apply -f k8s/managedcertificate.yaml`
+2. Apply the Ingress to trigger GKE to build the Load Balancer:
 	- `kubectl apply -f k8s/ingress.yaml`
-3. Validate path routing once ingress IP is assigned:
-	- `curl.exe -sS -m 10 http://<INGRESS_IP>/a`
-	- `curl.exe -sS -m 10 http://<INGRESS_IP>/b`
+3. Wait for the certificate to provision (can take 10-30 mins):
+	- `kubectl get managedcertificate webapps-cert -w`
+4. Smoke test the path routing:
+	- `curl https://app.yourapp.com/a`
+	- `curl https://app.yourapp.com/b`
 
 ## 5) Widen sink for HTTP load balancer logs
 1. Update sink filter to include LB logs needed for request latency query:

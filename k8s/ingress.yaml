@@ -1,17 +1,33 @@
+# Global external HTTPS load balancer fronting both web apps.
+#
+# Wiring (all created by IaC in this repo):
+#   - Static anycast IP    -> terraform google_compute_global_address.webapps_lb_ip ("webapps-lb-ip")
+#   - Cloud Armor WAF      -> terraform google_compute_security_policy.webapps_waf, attached via BackendConfig
+#   - Managed TLS cert     -> k8s ManagedCertificate "webapps-cert"
+#   - HTTP->HTTPS redirect -> k8s FrontendConfig "webapps-frontendconfig"
+#   - Container-native LB  -> Service NEG annotations (routes LB straight to pods)
+#
+# Apply order:
+#   kubectl apply -f backendconfig.yaml -f frontendconfig.yaml -f managedcertificate.yaml
+#   kubectl apply -f webapp-a-service.yaml -f webapp-b-service.yaml
+#   kubectl apply -f ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: webapps-ingress
+  namespace: default
   annotations:
     kubernetes.io/ingress.class: "gce"
+    # Reserved global static IP (terraform output: lb_static_ip).
+    kubernetes.io/ingress.global-static-ip-name: "webapps-lb-ip"
+    # Google-managed TLS certificate.
+    networking.gke.io/managed-certificates: "webapps-cert"
+    # HTTP -> HTTPS redirect.
+    networking.gke.io/v1beta1.FrontendConfig: "webapps-frontendconfig"
 spec:
-  defaultBackend:
-    service:
-      name: webapp-a
-      port:
-        number: 80
   rules:
-  - http:
+  - host: app.example.com
+    http:
       paths:
       - path: /a
         pathType: Prefix
@@ -27,8 +43,14 @@ spec:
             name: webapp-b
             port:
               number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-a
+            port:
+              number: 80
 
-# GKE Ingress backends are expected to map to NodePort services.
-# If your services are currently LoadBalancer/ClusterIP, patch them before applying this ingress:
-# kubectl patch svc webapp-a -n default -p '{"spec":{"type":"NodePort"}}'
-# kubectl patch svc webapp-b -n default -p '{"spec":{"type":"NodePort"}}'
+# Container-native load balancing (NEG) is enabled on the Services, so the LB
+# routes directly to pods. Services are NodePort (see webapp-a/b-service.yaml).
+# No manual `kubectl patch` needed.

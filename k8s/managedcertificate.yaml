@@ -1,0 +1,12 @@
+# Google-managed TLS certificate provisioned automatically for the app
+# hostname. Must match the host used in DNS and the Ingress rules. Update
+# the domain to a hostname you control (and that resolves to the LB static IP)
+# before applying, otherwise provisioning stays in FAILED_NOT_VISIBLE.
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: webapps-cert
+  namespace: default
+spec:
+  domains:
+    - app.example.com

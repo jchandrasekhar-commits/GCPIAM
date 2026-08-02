@@ -76,7 +76,7 @@
           "refId": "A"
         }
       ],
-      "title": "Application Error Rate by Namespace (%)",
+      "title": "GKE Application Error Rate by Namespace (%)",
       "type": "timeseries"
     },
     {
@@ -153,11 +153,11 @@
       "targets": [
         {
           "format": "time_series",
-          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    CAST(JSON_VALUE(httpRequest, '$.latency') AS STRING) AS latency_str\n  FROM `${project}.${dataset}.requests_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n), parsed AS (\n  SELECT\n    time,\n    SAFE_CAST(REGEXP_REPLACE(latency_str, r's$', '') AS FLOAT64) * 1000 AS latency_ms\n  FROM latency\n  WHERE latency_str IS NOT NULL\n), q AS (\n  SELECT\n    time,\n    APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM parsed\n  GROUP BY time\n)\nSELECT time, 'p50' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL\nSELECT time, 'p95' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL\nSELECT time, 'p99' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
+          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    CAST(JSON_VALUE(httpRequest, '$.latency') AS STRING) AS latency_str\n  FROM `${project}.${dataset}.requests_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n), parsed AS (\n  SELECT\n    time,\n    SAFE_CAST(REGEXP_REPLACE(latency_str, r's$', '') AS FLOAT64) * 1000 AS latency_ms\n  FROM latency\n  WHERE latency_str IS NOT NULL\n), q AS (\n  SELECT\n    time,\n    APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM parsed\n  GROUP BY time\n)\nSELECT time, 'p50 (Median)' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL\nSELECT time, 'p95 (Degraded)' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL\nSELECT time, 'p99 (Outliers)' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Request Latency p50/p95/p99 (ms)",
+      "title": "Ingress Request Latency Percentiles (p50/p95/p99) (ms)",
       "type": "timeseries"
     },
     {
@@ -193,11 +193,11 @@
       "targets": [
         {
           "format": "time_series",
-          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  CASE\n    WHEN logName LIKE '%stdout%' THEN 'stdout_lines'\n    WHEN logName LIKE '%stderr%' THEN 'stderr_lines'\n    ELSE 'events'\n  END AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.events_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  CAST(JSON_VALUE(httpRequest, '$.status') AS STRING) AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.requests_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND JSON_VALUE(httpRequest, '$.status') IS NOT NULL\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Resource/Activity Utilization Trend (log activity proxy)",
+      "title": "Ingress HTTP Status Codes (2xx, 4xx, 5xx)",
       "type": "timeseries"
     }
   ],

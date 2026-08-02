@@ -6,11 +6,22 @@ This design uses a primary GKE Standard cluster (`gke-primary`, `us-central1`) p
 ## Mermaid Diagram
 ```mermaid
 flowchart LR
-  U[Customer] --> DNS[Cloud DNS]
-  DNS --> GLB["Global HTTP(S) Load Balancer"]
-  GLB --> ING[GKE Ingress]
+  U[Customer] --> DNS[Cloud DNS app-zone]
+  DNS --> IP[Global Static IP webapps-lb-ip]
+  IP --> GLB["Global External HTTPS LB<br/>SSL termination + HTTP→HTTPS"]
+  GLB --> WAF[Cloud Armor WAF webapps-waf]
+  WAF --> NEG[Container-native NEG]
+  NEG --> ING[GKE Ingress webapps-ingress]
 
-  subgraph GKE_PRIMARY["GKE Cluster: gke-primary"]
+  subgraph VPC["Custom-mode VPC: gke-vpc"]
+    subgraph SUBNETS["Segregated subnets"]
+      GSUB[gke-primary-subnet<br/>+ pods/services alias ranges]
+      LSUB[lb-proxy-subnet]
+      OSUB[ops-subnet]
+    end
+  end
+
+  subgraph GKE_PRIMARY["GKE Cluster: gke-primary (us-central1)"]
     SA[Service webapp-a]
     SB[Service webapp-b]
     PA[Pods webapp-a]
@@ -28,24 +39,34 @@ flowchart LR
 
   PA --> NAT[Cloud NAT]
   PB --> NAT
+  PSA[Private Service Access] -.-> CSQL[(Cloud SQL HA / Memorystore)]
 
   PA --> LOGS[Cloud Logging]
   PB --> LOGS
   GLB --> LOGS
+  PA --> GMP[Managed Prometheus]
+  PA --> TRACE[Cloud Trace / Profiler]
   LOGS --> SINK[Logging Sink export-to-bq]
   SINK --> BQ[BigQuery logs_dataset_us]
   BQ --> GRAF[Grafana BigQuery Datasource]
+  GLB --> UPT[Uptime check + alert]
 ```
 
+## Network Segmentation
+| Subnet | CIDR | Purpose |
+|--------|------|---------|
+| `gke-primary-subnet` | `10.10.0.0/20` (+ `gke-pods 10.11.0.0/16`, `gke-services 10.12.0.0/20`) | GKE nodes and VPC-native alias IP ranges |
+| `lb-proxy-subnet` | `10.30.0.0/23` | `REGIONAL_MANAGED_PROXY` for L7 (Envoy) load balancers |
+| `ops-subnet` | `10.40.0.0/24` | Monitoring / ops tooling, bastion, agents |
+| PSA range | `/16` auto | Private Service Access peering for Cloud SQL HA / Memorystore |
+
 ## End-to-End Traffic Flow
-1. Client resolves service hostname in Cloud DNS.
-2. DNS maps to global load balancer frontend IP.
-3. Global load balancer forwards to GKE ingress.
-4. Ingress applies path routing:
-   - `/a` -> `webapp-a`
-   - `/b` -> `webapp-b`
-5. Kubernetes services forward traffic to application pods.
-6. Outbound traffic uses Cloud NAT.
+1. Client resolves the app hostname in **Cloud DNS** (`app-zone`) → **global static IP** (`webapps-lb-ip`).
+2. **Global external HTTPS load balancer** terminates TLS (Google-managed certificate) and redirects any HTTP to HTTPS.
+3. **Cloud Armor WAF** (`webapps-waf`) inspects the request: OWASP SQLi/XSS preconfigured rules, per-IP rate limiting, and adaptive L7 DDoS defense.
+4. The LB routes to a **container-native NEG**, hitting healthy pods directly (health check on `:8080/`).
+5. GKE **Ingress** applies path routing: `/a` → `webapp-a`, `/b` → `webapp-b`.
+6. Outbound pod traffic egresses via **Cloud NAT**; Google-managed services reach the VPC over **Private Service Access**.
 
 ## Observability Data Path
 1. App logs and platform events are written to Cloud Logging.

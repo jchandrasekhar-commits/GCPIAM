@@ -4,14 +4,75 @@ provider "google" {
 }
 
 resource "google_compute_network" "vpc" {
-  name = "gke-vpc"
+  name                    = "gke-vpc"
+  auto_create_subnetworks = false
 }
 
+# --- Segregated subnets -----------------------------------------------------
+# The assignment asks for VPC segmentation with dedicated subnets for GKE
+# workloads, load balancers, and monitoring/ops. Below:
+#   - gke-primary-subnet : GKE nodes + VPC-native alias ranges (pods/services)
+#   - lb-proxy-subnet     : REGIONAL_MANAGED_PROXY subnet required by the
+#                           envoy-based L7 load balancers (Cloud Armor path)
+#   - ops-subnet          : monitoring/ops jump hosts, bastion, agents
 resource "google_compute_subnetwork" "primary_subnet" {
-  name          = "gke-primary-subnet"
-  ip_cidr_range = "10.10.0.0/20"
-  network       = google_compute_network.vpc.name
+  name                     = "gke-primary-subnet"
+  ip_cidr_range            = "10.10.0.0/20"
+  network                  = google_compute_network.vpc.name
+  region                   = var.region
+  private_ip_google_access = true
+
+  # VPC-native cluster: dedicated secondary (alias IP) ranges for pods/services.
+  secondary_ip_range {
+    range_name    = "gke-pods"
+    ip_cidr_range = "10.11.0.0/16"
+  }
+  secondary_ip_range {
+    range_name    = "gke-services"
+    ip_cidr_range = "10.12.0.0/20"
+  }
+
+  log_config {
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
+}
+
+# Proxy-only subnet dedicated to L7 (Envoy) load balancers in the primary region.
+resource "google_compute_subnetwork" "lb_proxy_subnet" {
+  name          = "lb-proxy-subnet"
+  ip_cidr_range = "10.30.0.0/23"
+  network       = google_compute_network.vpc.id
   region        = var.region
+  purpose       = "REGIONAL_MANAGED_PROXY"
+  role          = "ACTIVE"
+}
+
+# Dedicated monitoring/ops subnet (bastion, agents, ops tooling).
+resource "google_compute_subnetwork" "ops_subnet" {
+  name                     = "ops-subnet"
+  ip_cidr_range            = "10.40.0.0/24"
+  network                  = google_compute_network.vpc.name
+  region                   = var.region
+  private_ip_google_access = true
+}
+
+# --- Private Service Access (PSA) ------------------------------------------
+# Allocates a range and creates the VPC peering Google managed services (e.g.
+# Cloud SQL HA, Memorystore) use for private connectivity.
+resource "google_compute_global_address" "psa_range" {
+  name          = "google-managed-services-range"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc.id
+}
+
+resource "google_service_networking_connection" "psa" {
+  network                 = google_compute_network.vpc.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.psa_range.name]
 }
 
 # --- Outbound egress: Cloud NAT for the primary region ----------------------
@@ -72,9 +133,31 @@ resource "google_container_cluster" "primary" {
   remove_default_node_pool = false
   initial_node_count       = 1
   node_locations           = ["us-central1-a", "us-central1-b"]
-  ip_allocation_policy {}
+
+  # VPC-native cluster bound to the dedicated pod/service alias ranges.
+  ip_allocation_policy {
+    cluster_secondary_range_name  = "gke-pods"
+    services_secondary_range_name = "gke-services"
+  }
+
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
+  }
+
+  # Google Cloud Managed Service for Prometheus (metrics) + full Cloud Logging.
+  monitoring_config {
+    managed_prometheus {
+      enabled = true
+    }
+    enable_components = ["SYSTEM_COMPONENTS"]
+  }
+  logging_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
+
+  # Binary Authorization: only attested images may run.
+  binary_authorization {
+    evaluation_mode = var.enable_binary_authorization ? "PROJECT_SINGLETON_POLICY_ENFORCE" : "DISABLED"
   }
 
   # Private nodes (no public IPs); egress via Cloud NAT. Control-plane endpoint
@@ -133,11 +216,27 @@ resource "google_container_node_pool" "default_pool" {
 # Enabled only when var.enable_secondary = true. Same VPC, dedicated subnet in
 # the secondary region, matching node pool + Workload Identity for symmetry.
 resource "google_compute_subnetwork" "secondary_subnet" {
-  count         = var.enable_secondary ? 1 : 0
-  name          = "gke-secondary-subnet"
-  ip_cidr_range = var.secondary_subnet_cidr
-  network       = google_compute_network.vpc.name
-  region        = var.secondary_region
+  count                    = var.enable_secondary ? 1 : 0
+  name                     = "gke-secondary-subnet"
+  ip_cidr_range            = var.secondary_subnet_cidr
+  network                  = google_compute_network.vpc.name
+  region                   = var.secondary_region
+  private_ip_google_access = true
+
+  secondary_ip_range {
+    range_name    = "gke-secondary-pods"
+    ip_cidr_range = "10.21.0.0/16"
+  }
+  secondary_ip_range {
+    range_name    = "gke-secondary-services"
+    ip_cidr_range = "10.22.0.0/20"
+  }
+
+  log_config {
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
 }
 
 # Cloud NAT for the secondary region (only when the secondary cluster is on).
@@ -171,9 +270,28 @@ resource "google_container_cluster" "secondary" {
   remove_default_node_pool = false
   initial_node_count       = 1
   node_locations           = var.secondary_node_locations
-  ip_allocation_policy {}
+
+  ip_allocation_policy {
+    cluster_secondary_range_name  = "gke-secondary-pods"
+    services_secondary_range_name = "gke-secondary-services"
+  }
+
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
+  }
+
+  monitoring_config {
+    managed_prometheus {
+      enabled = true
+    }
+    enable_components = ["SYSTEM_COMPONENTS"]
+  }
+  logging_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
+
+  binary_authorization {
+    evaluation_mode = var.enable_binary_authorization ? "PROJECT_SINGLETON_POLICY_ENFORCE" : "DISABLED"
   }
 
   dynamic "private_cluster_config" {
