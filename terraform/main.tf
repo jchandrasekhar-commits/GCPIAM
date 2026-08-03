@@ -6,6 +6,11 @@ provider "google" {
 resource "google_compute_network" "vpc" {
   name                    = "gke-vpc"
   auto_create_subnetworks = false
+
+  # Wait for the required APIs (compute.googleapis.com, etc.) to be enabled
+  # before creating any resources, otherwise the first apply fails with a 403
+  # "API not enabled" until enablement propagates.
+  depends_on = [google_project_service.enabled]
 }
 
 # --- Segregated subnets -----------------------------------------------------
@@ -139,7 +144,9 @@ resource "google_container_cluster" "primary" {
   location                 = var.region
   network                  = google_compute_network.vpc.name
   subnetwork               = google_compute_subnetwork.primary_subnet.name
-  remove_default_node_pool = false
+  # Remove the auto-created pool so the managed google_container_node_pool below
+  # is the only one (avoids the "default-pool already exists" name collision).
+  remove_default_node_pool = true
   initial_node_count       = 1
   node_locations           = ["us-central1-a", "us-central1-b"]
 
@@ -282,7 +289,7 @@ resource "google_container_cluster" "secondary" {
   location                 = var.secondary_region
   network                  = google_compute_network.vpc.name
   subnetwork               = google_compute_subnetwork.secondary_subnet[0].name
-  remove_default_node_pool = false
+  remove_default_node_pool = true
   initial_node_count       = 1
   node_locations           = var.secondary_node_locations
 

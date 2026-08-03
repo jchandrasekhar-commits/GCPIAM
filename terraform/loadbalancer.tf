@@ -13,6 +13,7 @@ resource "google_compute_global_address" "webapps_lb_ip" {
   name        = "webapps-lb-ip"
   ip_version  = "IPV4"
   description = "Static anycast frontend IP for the global external HTTPS load balancer."
+  depends_on  = [google_project_service.enabled]
 }
 
 # --- Cloud Armor WAF security policy ----------------------------------------
