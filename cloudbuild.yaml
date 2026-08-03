@@ -9,35 +9,26 @@ substitutions:
 steps:
 # --- Build AND push each image immediately ----------------------------------
 # Push right after each build so images land in Artifact Registry even if a
-# later step (deploy) fails. (The trailing `images:` field only pushes after
-# ALL steps succeed, which hid images whenever the deploy step failed.)
+# later step (deploy) fails. Plain arg arrays use only Cloud Build
+# substitutions (no shell vars, which would need $$ escaping).
 - name: 'gcr.io/cloud-builders/docker'
-  id: vote
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    IMG="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}"
-    docker build -t "$IMG" apps/vote
-    docker push "$IMG"
+  id: build-vote
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}', 'apps/vote']
 - name: 'gcr.io/cloud-builders/docker'
-  id: worker
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    IMG="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}"
-    docker build -t "$IMG" apps/worker
-    docker push "$IMG"
+  id: push-vote
+  args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}']
 - name: 'gcr.io/cloud-builders/docker'
-  id: result
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    IMG="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}"
-    docker build -t "$IMG" apps/result
-    docker push "$IMG"
+  id: build-worker
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}', 'apps/worker']
+- name: 'gcr.io/cloud-builders/docker'
+  id: push-worker
+  args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}']
+- name: 'gcr.io/cloud-builders/docker'
+  id: build-result
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}', 'apps/result']
+- name: 'gcr.io/cloud-builders/docker'
+  id: push-result
+  args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}']
 
 # --- Deploy: substitute image placeholders, then apply ----------------------
 - name: 'gcr.io/cloud-builders/kubectl'
@@ -47,10 +38,11 @@ steps:
   - '-c'
   - |
     # entrypoint: bash bypasses the kubectl builder's auto get-credentials
-    # wrapper, so fetch cluster credentials explicitly first.
+    # wrapper, so fetch cluster credentials explicitly first. Shell variables
+    # are escaped as $$ so Cloud Build does not treat them as substitutions.
     gcloud container clusters get-credentials gke-primary --region ${_REGION} --project $PROJECT_ID
     for f in k8s/webapp-a-deployment.yaml k8s/webapp-b-deployment.yaml k8s/worker-deployment.yaml; do
-      sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:${_TAG}|g" "$f"
+      sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:${_TAG}|g" "$$f"
     done
     kubectl apply -f k8s/webapp-config.yaml
     kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
