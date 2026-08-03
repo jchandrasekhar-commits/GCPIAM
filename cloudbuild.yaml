@@ -1,15 +1,45 @@
+substitutions:
+  _REGION: us-central1
+  _REPO: webapps
+
 steps:
+# --- Build the three service images -----------------------------------------
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/$PROJECT_ID/webapp-a:$SHORT_SHA', '.']
+  id: build-vote
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:$SHORT_SHA',
+         '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:latest', 'apps/vote']
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/$PROJECT_ID/webapp-a:$SHORT_SHA']
+  id: build-worker
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$SHORT_SHA',
+         '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:latest', 'apps/worker']
+- name: 'gcr.io/cloud-builders/docker'
+  id: build-result
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:$SHORT_SHA',
+         '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:latest', 'apps/result']
+
+# --- Deploy: substitute image placeholders, then apply ----------------------
 - name: 'gcr.io/cloud-builders/kubectl'
-  args: ['apply', '-f', 'k8s/webapp-a-deployment.yaml']
+  id: deploy
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    for f in k8s/webapp-a-deployment.yaml k8s/webapp-b-deployment.yaml k8s/worker-deployment.yaml; do
+      sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:$SHORT_SHA|g" "$f"
+    done
+    kubectl apply -f k8s/webapp-config.yaml
+    kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
+    kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml -f k8s/webapp-b-hpa.yaml
+    kubectl apply -f k8s/worker-deployment.yaml
   env:
-  - 'CLOUDSDK_COMPUTE_REGION=$REGION'
+  - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=gke-primary'
 
 images:
-- 'gcr.io/$PROJECT_ID/webapp-a:$SHORT_SHA'
+- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:$SHORT_SHA'
+- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$SHORT_SHA'
+- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:$SHORT_SHA'
 
 options:
   substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY

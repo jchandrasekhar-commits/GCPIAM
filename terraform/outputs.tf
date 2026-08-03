@@ -29,3 +29,18 @@ output "cloud_armor_policy" {
   value       = google_compute_security_policy.webapps_waf.name
   description = "Cloud Armor WAF policy name referenced by the k8s BackendConfig."
 }
+
+output "webapp_b_sql_private_ip" {
+  value       = var.enable_stateful_services ? google_sql_database_instance.webapp_b[0].private_ip_address : null
+  description = "Private IP of Web App B's HA Cloud SQL instance (null when enable_stateful_services = false)."
+}
+
+output "webapp_b_redis_host" {
+  value       = var.enable_stateful_services ? google_redis_instance.cache[0].host : null
+  description = "Host of Web App B's Memorystore (Redis) HA cache (null when disabled)."
+}
+
+output "webapp_b_pubsub_topic" {
+  value       = var.enable_stateful_services ? google_pubsub_topic.webapp_b[0].name : null
+  description = "Pub/Sub topic available to Web App B (null when disabled)."
+}

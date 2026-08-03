@@ -18,6 +18,10 @@ locals {
     "cloudprofiler.googleapis.com",     # Cloud Profiler
     "clouderrorreporting.googleapis.com",
     "binaryauthorization.googleapis.com",
+    "sqladmin.googleapis.com",  # Cloud SQL (Web App B)
+    "redis.googleapis.com",     # Memorystore for Redis (Web App B)
+    "pubsub.googleapis.com",    # Pub/Sub (Web App B)
+    "artifactregistry.googleapis.com", # container images (vote/worker/result)
   ]
 }
 

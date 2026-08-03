@@ -1,0 +1,43 @@
+# Worker (3rd service) - backend sync process.
+# Drains votes from Redis (Memorystore) and writes the durable tally to
+# Cloud SQL (PostgreSQL). It is the single writer to the DB, which keeps the
+# result app consistent. No Service is exposed - this is a background worker.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app: worker
+    role: worker
+spec:
+  # Single writer keeps ordering simple; BLPOP is atomic so this can scale if needed.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: worker
+        role: worker
+    spec:
+      serviceAccountName: webapp-ksa
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: worker
+        # Built + pushed by cloudbuild.yaml to Artifact Registry.
+        image: REGION-docker.pkg.dev/PROJECT_ID/webapps/worker:latest
+        envFrom:
+        - configMapRef:
+            name: webapp-config
+        - secretRef:
+            name: webapp-db-secret
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "256Mi"

@@ -66,7 +66,7 @@ variable "master_authorized_cidrs" {
 variable "enable_binary_authorization" {
   type        = bool
   default     = false
-  description = "Enforce Binary Authorization (only attested images run). Off by default so the demo hello-app image still deploys."
+  description = "Enforce Binary Authorization (only attested images run). Off by default so the demo images still deploy without attestation."
 }
 
 variable "enable_cloud_dns" {
@@ -91,4 +91,18 @@ variable "uptime_alert_email" {
   type        = string
   default     = ""
   description = "Email address for the uptime-check alert notification channel. Leave empty to skip creating the channel."
+}
+
+# --- Web App B stateful backing services (Cloud SQL HA + Memorystore) -------
+variable "enable_stateful_services" {
+  type        = bool
+  default     = false
+  description = "Provision Web App B's backing services: a regional (HA) Cloud SQL instance with automated backups/PITR and a Memorystore (Redis) HA cache. Off by default to stay within the free tier."
+}
+
+variable "db_password" {
+  type        = string
+  default     = "replace-me-with-a-real-password"
+  sensitive   = true
+  description = "Password for the Cloud SQL application user. Override with -var or a tfvars file; do not commit real secrets."
 }

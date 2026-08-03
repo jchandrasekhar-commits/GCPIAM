@@ -35,7 +35,7 @@ kubectl port-forward svc/webapp-a 8081:80
 # In Terminal 2: Run test
 curl http://localhost:8081/
 ```
-**Expected Output:** 
+**Output:** 
 ```text
 Hello, world!
 Version: 1.0.0

@@ -72,7 +72,7 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY') OR logName LIKE '%stderr%', 1, 0) AS is_error\n  FROM `${project}.${dataset}.*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  namespace AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY'), 1, 0) AS is_error\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    1 AS is_error\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  namespace AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -112,11 +112,11 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND COALESCE(severity, '') IN ('ERROR','CRITICAL','ALERT','EMERGENCY')\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stderr_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND (textPayload LIKE '%Back-off%' OR textPayload LIKE '%Restarting%' OR textPayload LIKE '%Restarted%' OR textPayload LIKE '%CrashLoopBackOff%')\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "stderr Error Events by Namespace",
+      "title": "Pod Restart Counts by Namespace",
       "type": "timeseries"
     },
     {
@@ -153,11 +153,11 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "WITH log_lines AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n    COUNT(1) AS value\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  GROUP BY time, metric\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n    COUNT(1) AS value\n  FROM `${project}.${dataset}.*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  GROUP BY time, metric\n)\nSELECT time, metric, SUM(value) AS value\nFROM log_lines\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    SAFE_CAST(REGEXP_EXTRACT(textPayload, r'request_time=([0-9.]+)') AS FLOAT64) * 1000 AS latency_ms\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n    AND textPayload LIKE '%request_time=%'\n), q AS (\n  SELECT\n    time,\n    APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM latency\n  WHERE latency_ms IS NOT NULL\n  GROUP BY time\n)\nSELECT time, 'p50 (Median)' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL\nSELECT time, 'p95 (Degraded)' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL\nSELECT time, 'p99 (Outliers)' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Application Log Volume by Namespace",
+      "title": "Request Latency Percentiles (p50/p95/p99) (ms)",
       "type": "timeseries"
     },
     {
@@ -193,52 +193,11 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "-- Resource/activity utilization trend. CPU/memory are true metrics sourced\n-- from Managed Prometheus (see grafana/dashboard-cloud-monitoring.json); this\n-- BigQuery panel shows throughput/log-activity per namespace as a proxy trend.\nSELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stdout_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "stderr Log Volume by Namespace",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "grafana-bigquery-datasource",
-        "uid": "${DS_BQ}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 5,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "format": 0,
-          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    SAFE_CAST(REGEXP_EXTRACT(textPayload, r'request_time=([0-9.]+)') AS FLOAT64) * 1000 AS latency_ms\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n    AND textPayload LIKE '%request_time=%'\n), q AS (\n  SELECT\n    time,\n    APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM latency\n  WHERE latency_ms IS NOT NULL\n  GROUP BY time\n)\nSELECT time, 'p50 (Median)' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL\nSELECT time, 'p95 (Degraded)' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL\nSELECT time, 'p99 (Outliers)' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
-          "refId": "A"
-        }
-      ],
-      "title": "Request Latency Percentiles (p50/p95/p99) (ms)",
+      "title": "Resource Utilization Trend (throughput proxy)",
       "type": "timeseries"
     }
   ],

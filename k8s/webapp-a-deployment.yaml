@@ -1,9 +1,11 @@
+# Web Application A - Vote frontend (GCP vs AWS). Writes votes to Redis.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: webapp-a
   labels:
     app: webapp-a
+    role: vote
 spec:
   replicas: 2
   selector:
@@ -13,31 +15,29 @@ spec:
     metadata:
       labels:
         app: webapp-a
+        role: vote
     spec:
       serviceAccountName: webapp-ksa
-      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
       containers:
-      - name: webapp-a
-        image: gcr.io/google-samples/hello-app:1.0
+      - name: vote
+        # Built + pushed by cloudbuild.yaml to Artifact Registry.
+        image: REGION-docker.pkg.dev/PROJECT_ID/webapps/vote:latest
         ports:
-        - containerPort: 8081
-        env:
-        - name: PORT
-          value: "8081"
+        - containerPort: 8080
         envFrom:
         - configMapRef:
             name: webapp-config
         readinessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 3
         livenessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
@@ -48,31 +48,20 @@ spec:
               command: ["/bin/sh", "-c", "sleep 5"]
         resources:
           requests:
-            cpu: "25m"
-            memory: "64Mi"
-          limits:
-            cpu: "250m"
+            cpu: "50m"
             memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
         volumeMounts:
         - mountPath: "/mnt/secrets-store"
           name: secrets-store-inline
           readOnly: true
-      - name: webapp-proxy
-        image: nginx:1.27-alpine
-        ports:
-        - containerPort: 8080
-        command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf"]
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/nginx.conf
-          subPath: nginx.conf
       volumes:
+      # Secret Manager via the GKE Secrets Store CSI driver (Workload Identity).
       - name: secrets-store-inline
         csi:
           driver: secrets-store-gke.csi.k8s.io
           readOnly: true
           volumeAttributes:
             secretProviderClass: "gcp-secrets-provider"
-      - name: nginx-config
-        configMap:
-          name: webapp-nginx-config

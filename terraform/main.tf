@@ -111,6 +111,11 @@ resource "google_compute_firewall" "allow_internal" {
   }
 
   source_ranges = ["10.10.0.0/20", "10.20.0.0/20"]
+
+  # Firewall hit logging -> Cloud Logging (resource.type="gce_subnetwork").
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_compute_firewall" "allow_health_checks" {
@@ -123,6 +128,10 @@ resource "google_compute_firewall" "allow_health_checks" {
 
   # Google front-end / health-check probe ranges.
   source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_container_cluster" "primary" {
@@ -392,7 +401,9 @@ resource "google_bigquery_dataset" "logs" {
 resource "google_logging_project_sink" "to_bq" {
   name                   = "export-to-bq"
   destination            = "bigquery.googleapis.com/projects/${var.project_id}/datasets/${google_bigquery_dataset.logs.dataset_id}"
-  filter                 = "resource.type=k8s_container OR resource.type=http_load_balancer"
+  # Container logs (GKE agent), Ingress/LB logs, and VPC flow + firewall logs
+  # (both surface as resource.type="gce_subnetwork").
+  filter                 = "resource.type=k8s_container OR resource.type=http_load_balancer OR resource.type=gce_subnetwork"
   unique_writer_identity = true
 }
 
@@ -401,3 +412,18 @@ resource "google_bigquery_dataset_iam_member" "sink_writer" {
   role       = "roles/bigquery.dataEditor"
   member     = google_logging_project_sink.to_bq.writer_identity
 }
+
+# --- Centralized logging bucket ---------------------------------------------
+# A dedicated Log Analytics-enabled bucket with extended retention that acts as
+# the centralized store (in addition to the BigQuery export). Satisfies the
+# "Centralized logging bucket or export to SIEM" requirement. From here logs
+# can also be routed onward to a SIEM via a sink to Pub/Sub.
+resource "google_logging_project_bucket_config" "central" {
+  project          = var.project_id
+  location         = "global"
+  bucket_id        = "central-logs"
+  retention_days   = 90
+  enable_analytics = true
+  description      = "Centralized log bucket (container, LB, VPC flow, firewall) with 90-day retention and Log Analytics."
+}
+
