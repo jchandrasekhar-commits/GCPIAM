@@ -5,7 +5,7 @@ metadata:
   labels:
     app: webapp-b
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: webapp-b
@@ -21,7 +21,10 @@ spec:
       - name: webapp-b
         image: gcr.io/google-samples/hello-app:1.0
         ports:
-        - containerPort: 8080
+        - containerPort: 8081
+        env:
+        - name: PORT
+          value: "8081"
         readinessProbe:
           httpGet:
             path: /
@@ -42,8 +45,21 @@ spec:
               command: ["/bin/sh", "-c", "sleep 5"]
         resources:
           requests:
-            cpu: "50m"
+            cpu: "25m"
             memory: "64Mi"
           limits:
             cpu: "250m"
             memory: "128Mi"
+      - name: webapp-proxy
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 8080
+        command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf"]
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: webapp-nginx-config

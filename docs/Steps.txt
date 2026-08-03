@@ -18,24 +18,24 @@ gcloud components install kubectl -q
 # Sink routing diagnostics (commands run)
 
 # Describe sink and list sinks
-gcloud logging sinks describe export-to-bq --project=project-80744ff2-3e39-47f5-a73 --format=json
-gcloud logging sinks list --project=project-80744ff2-3e39-47f5-a73 --format="table(name,destination,writerIdentity)"
+gcloud logging sinks describe export-to-bq --project=gke-cluster-504002 --format=json
+gcloud logging sinks list --project=gke-cluster-504002 --format="table(name,destination,writerIdentity)"
 
 # Inspect BigQuery dataset metadata and ACLs
-bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dataset
+bq show --format=prettyjson --project_id=gke-cluster-504002 logs_dataset
 
 # Outcome summary:
 # - Sink `export-to-bq` exists with writerIdentity `serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com`
 # - Dataset `logs_dataset` exists but is in location `us-central1` (regional); Logging exports to BigQuery typically require a multi-region dataset like `US` or `EU`.
 
 # Quick recommended fix (create US multi-region dataset and update sink):
-bq --location=US mk --dataset project-80744ff2-3e39-47f5-a73:logs_dataset_us
-gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 \
+bq --location=US mk --dataset gke-cluster-504002:logs_dataset_us
+gcloud projects add-iam-policy-binding gke-cluster-504002 \
 	--member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" \
 	--role="roles/bigquery.dataEditor"
 gcloud logging sinks update export-to-bq \
-	--destination="bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset_us" \
-	--project=project-80744ff2-3e39-47f5-a73
+	--destination="bigquery.googleapis.com/projects/gke-cluster-504002/datasets/logs_dataset_us" \
+	--project=gke-cluster-504002
 
 ---
 
@@ -50,7 +50,7 @@ setx BROWSER "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 # 2) Authenticate and set project
 gcloud auth login
-gcloud config set project project-80744ff2-3e39-47f5-a73
+gcloud config set project gke-cluster-504002
 
 # 3) Create ADC for Terraform (Application Default Credentials)
 gcloud auth application-default login
@@ -65,7 +65,7 @@ gcloud components install kubectl -q
 # 6) Terraform init + apply (and fixes)
 cd terraform
 terraform init
-terraform apply -var="project_id=project-80744ff2-3e39-47f5-a73" -var="region=us-central1" -auto-approve
+terraform apply -var="project_id=gke-cluster-504002" -var="region=us-central1" -auto-approve
 
 # Fixes applied during Terraform runs:
 # - Added `initial_node_count = 1` to `google_container_cluster.primary` to satisfy API validation
@@ -86,9 +86,9 @@ terraform apply -var="project_id=project-80744ff2-3e39-47f5-a73" -var="region=us
 # Sink remediation performed (executed):
 
 # Created US multi-region dataset and recreated sink pointing to it
-bq --location=US mk --dataset project-80744ff2-3e39-47f5-a73:logs_dataset_us
-gcloud logging sinks create export-to-bq bigquery.googleapis.com/projects/project-80744ff2-3e39-47f5-a73/datasets/logs_dataset_us --log-filter='resource.type="k8s_container"' --project=project-80744ff2-3e39-47f5-a73
-gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 --member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" --role="roles/bigquery.dataEditor"
+bq --location=US mk --dataset gke-cluster-504002:logs_dataset_us
+gcloud logging sinks create export-to-bq bigquery.googleapis.com/projects/gke-cluster-504002/datasets/logs_dataset_us --log-filter='resource.type="k8s_container"' --project=gke-cluster-504002
+gcloud projects add-iam-policy-binding gke-cluster-504002 --member="serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com" --role="roles/bigquery.dataEditor"
 
 # Verification (immediate):
 # - Sink now points at `logs_dataset_us`; writerIdentity: serviceAccount:service-11856948072@gcp-sa-logging.iam.gserviceaccount.com
@@ -96,7 +96,7 @@ gcloud projects add-iam-policy-binding project-80744ff2-3e39-47f5-a73 --member="
 # - No tables present yet (log ingestion may take several minutes)
 
 # Sink error discovered during investigation:
-# - logName: projects/project-80744ff2-3e39-47f5-a73/logs/logging.googleapis.com%2Fsink_error
+# - logName: projects/gke-cluster-504002/logs/logging.googleapis.com%2Fsink_error
 # - severity: ERROR
 # - error_code: table_invalid_schema
 # - detail: Cannot convert value to floating point (bad value): 2026-07-15T00:25:05Z

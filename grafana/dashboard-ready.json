@@ -255,8 +255,8 @@
       {
         "current": {
           "selected": false,
-          "text": "$PROJECT_ID",
-          "value": "$PROJECT_ID"
+          "text": "gke-cluster-504002",
+          "value": "gke-cluster-504002"
         },
         "hide": 0,
         "label": "project",
@@ -264,11 +264,11 @@
         "options": [
           {
             "selected": true,
-            "text": "$PROJECT_ID",
-            "value": "$PROJECT_ID"
+            "text": "gke-cluster-504002",
+            "value": "gke-cluster-504002"
           }
         ],
-        "query": "$PROJECT_ID",
+        "query": "gke-cluster-504002",
         "skipUrlSync": false,
         "type": "constant"
       },

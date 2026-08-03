@@ -55,15 +55,23 @@ kubectl port-forward svc/webapp-a 8080:80
 ```powershell
 # Edit k8s/managedcertificate.yaml and k8s/ingress.yaml to your real hostname first,
 # then set terraform vars: -var='enable_cloud_dns=true' -var='dns_domain=yourapp.com.' -var='app_hostname=app.yourapp.com'
-kubectl apply -f ../k8s/backendconfig.yaml
-kubectl apply -f ../k8s/frontendconfig.yaml
-kubectl apply -f ../k8s/managedcertificate.yaml
-kubectl apply -f ../k8s/webapp-a-service.yaml
-kubectl apply -f ../k8s/webapp-b-service.yaml
-kubectl apply -f ../k8s/ingress.yaml
+
+# Enable the Secret Manager add-on before applying the provider class and backend
+gcloud container clusters update gke-primary --region us-central1 --project <PROJECT_ID> --enable-secret-manager
+
+kubectl apply -f k8s/secretproviderclass.yaml
+kubectl apply -f k8s/backendconfig.yaml
+kubectl apply -f k8s/frontendconfig.yaml
+kubectl apply -f k8s/managedcertificate.yaml
+kubectl apply -f k8s/webapp-a-service.yaml
+kubectl apply -f k8s/webapp-b-service.yaml
+kubectl apply -f k8s/ingress.yaml
+
 # Point your DNS A record at the reserved IP:
-terraform -chdir=../terraform output lb_static_ip
+terraform -chdir=terraform output lb_static_ip
 ```
+
+6. To test the Load Balancer deployment and WAF locally without modifying DNS, check out [docs/test-curl-commands.md](docs/test-curl-commands.md) for curl override commands.
 
 ## IAM Roles
 This repo includes role mappings for Dev, Ops, SRE, and CI/CD access.

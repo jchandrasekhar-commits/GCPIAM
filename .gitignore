@@ -9,3 +9,7 @@ coverage/
 .idea/
 .vscode/
 .DS_Store
+
+# Local/sensitive artifacts
+keys.json
+docs/final
