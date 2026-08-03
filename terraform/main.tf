@@ -153,6 +153,12 @@ resource "google_container_cluster" "primary" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
+  # Enable the managed Secrets Store CSI driver so pods can mount Secret Manager
+  # secrets (see k8s/secretproviderclass.yaml + the vote deployment).
+  secret_manager_config {
+    enabled = true
+  }
+
   # Google Cloud Managed Service for Prometheus (metrics) + full Cloud Logging.
   monitoring_config {
     managed_prometheus {
@@ -287,6 +293,10 @@ resource "google_container_cluster" "secondary" {
 
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
+  }
+
+  secret_manager_config {
+    enabled = true
   }
 
   monitoring_config {
