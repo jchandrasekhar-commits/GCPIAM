@@ -25,6 +25,9 @@ steps:
   args:
   - '-c'
   - |
+    # entrypoint: bash bypasses the kubectl builder's auto get-credentials
+    # wrapper, so fetch cluster credentials explicitly first.
+    gcloud container clusters get-credentials gke-primary --region ${_REGION} --project $PROJECT_ID
     for f in k8s/webapp-a-deployment.yaml k8s/webapp-b-deployment.yaml k8s/worker-deployment.yaml; do
       sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:${_TAG}|g" "$f"
     done
