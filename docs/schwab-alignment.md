@@ -52,7 +52,7 @@ map almost one-to-one onto what this assignment already produced:
 | Logical View | VPC -> cluster -> services -> pods flow |
 | Security & IAM View | `terraform/roles.tf`, Workload Identity, Secret Manager |
 | Deployment View | Terraform IaC + `docs/Steps.txt` |
-| Data View | BigQuery `logs_dataset_us` |
+| Data View | BigQuery `logs_webapp_us` |
 | Visibility & Monitoring View | Grafana + Cloud Monitoring dashboards |
 | Cost Drivers / Analysis | Free-tier trade-off notes |
 

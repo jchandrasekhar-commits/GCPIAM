@@ -268,12 +268,12 @@
         "type": "constant"
       },
       {
-        "current": { "selected": false, "text": "logs_webapp_us", "value": "logs_webapp_us" },
+        "current": { "selected": false, "text": "logs_dataset_us", "value": "logs_dataset_us" },
         "hide": 0,
         "label": "dataset",
         "name": "dataset",
-        "options": [ { "selected": true, "text": "logs_webapp_us", "value": "logs_webapp_us" } ],
-        "query": "logs_webapp_us",
+        "options": [ { "selected": true, "text": "logs_dataset_us", "value": "logs_dataset_us" } ],
+        "query": "logs_dataset_us",
         "skipUrlSync": false,
         "type": "constant"
       },

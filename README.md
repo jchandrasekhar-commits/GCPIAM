@@ -179,8 +179,8 @@ Once Grafana is running and the LoadBalancer IP is assigned, open `http://<GRAFA
 2. Add BigQuery datasource.
 3. Import dashboard JSON from `grafana/dashboard.json`.
 4. Set constants:
-	 - `project = project-80744ff2-3e39-47f5-a73`
-	 - `dataset = logs_dataset_us`
+	 - `project = project-pubsub-32009`
+	 - `dataset = logs_webapp_us`
 5. Ensure panels show data.
 6. Capture a screenshot with all 4 panels visible.
 

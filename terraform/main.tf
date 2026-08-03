@@ -406,7 +406,10 @@ resource "google_service_account" "cicd" {
 resource "google_bigquery_dataset" "logs" {
   dataset_id = var.bq_dataset
   # Use multi-region US to avoid Cloud Logging->BigQuery table_invalid_schema issues seen with regional datasets.
-  location   = "US"
+  location = "US"
+  # Allow terraform to delete the dataset even after the sink has created log
+  # tables in it (otherwise destroy/rename fails with "dataset ... is still in use").
+  delete_contents_on_destroy = true
 }
 
 resource "google_logging_project_sink" "to_bq" {

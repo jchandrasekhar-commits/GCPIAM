@@ -15,7 +15,7 @@ WITH app_logs AS (
     COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
     severity,
     'stdout' AS stream
-  FROM `PROJECT_ID.logs_webapp_us.stdout_*`
+  FROM `PROJECT_ID.logs_dataset_us.stdout_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
 
@@ -26,7 +26,7 @@ WITH app_logs AS (
     COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
     severity,
     'stderr' AS stream
-  FROM `PROJECT_ID.logs_webapp_us.stderr_*`
+  FROM `PROJECT_ID.logs_dataset_us.stderr_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
 )
@@ -47,7 +47,7 @@ SELECT
   TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
   COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
   COUNT(1) AS error_events
-FROM `PROJECT_ID.logs_webapp_us.stderr_*`
+FROM `PROJECT_ID.logs_dataset_us.stderr_*`
 WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
   AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
   AND COALESCE(severity, '') IN ('ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY')
@@ -61,7 +61,7 @@ WITH log_lines AS (
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
     COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
     COUNT(1) AS value
-  FROM `PROJECT_ID.logs_webapp_us.stdout_*`
+  FROM `PROJECT_ID.logs_dataset_us.stdout_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
   GROUP BY time, namespace
@@ -72,7 +72,7 @@ WITH log_lines AS (
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
     COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,
     COUNT(1) AS value
-  FROM `PROJECT_ID.logs_webapp_us.stderr_*`
+  FROM `PROJECT_ID.logs_dataset_us.stderr_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
   GROUP BY time, namespace
@@ -89,7 +89,7 @@ WITH log_vol AS (
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,
     COALESCE(resource.labels.namespace_name, 'unknown') AS metric,
     COUNT(1) AS value
-  FROM `PROJECT_ID.logs_webapp_us.stderr_*`
+  FROM `PROJECT_ID.logs_dataset_us.stderr_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
   GROUP BY time, metric
@@ -102,7 +102,7 @@ WITH latency AS (
   SELECT
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS minute_ts,
     SAFE_CAST(REGEXP_EXTRACT(textPayload, r'request_time=([0-9.]+)') AS FLOAT64) * 1000 AS latency_ms
-  FROM `PROJECT_ID.logs_webapp_us.stdout_*`
+  FROM `PROJECT_ID.logs_dataset_us.stdout_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
 ), q AS (

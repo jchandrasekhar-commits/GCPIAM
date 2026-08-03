@@ -47,7 +47,7 @@ flowchart LR
   PA --> GMP[Managed Prometheus]
   PA --> TRACE[Cloud Trace / Profiler]
   LOGS --> SINK[Logging Sink export-to-bq]
-  SINK --> BQ[BigQuery logs_dataset_us]
+  SINK --> BQ[BigQuery logs_webapp_us]
   BQ --> GRAF[Grafana BigQuery Datasource]
   GLB --> UPT[Uptime check + alert]
 ```
@@ -70,7 +70,7 @@ flowchart LR
 
 ## Observability Data Path
 1. App logs and platform events are written to Cloud Logging.
-2. Sink `export-to-bq` exports logs to BigQuery dataset `logs_dataset_us`.
+2. Sink `export-to-bq` exports logs to BigQuery dataset `logs_webapp_us`.
 3. Grafana queries BigQuery date-sharded tables (`stdout_*`, `stderr_*`, `events_*`, `requests_*`).
 4. Dashboard panels visualize error rate, restart signals, latency percentiles, and activity trend.
 
@@ -106,7 +106,7 @@ gcloud logging read "logName=projects/PROJECT_ID/logs/logging.googleapis.com%2Fs
 
 ### IaC Alignment
 - `terraform/main.tf`: BigQuery dataset location set to `US`.
-- `terraform/variables.tf`: default dataset set to `logs_dataset_us`.
+- `terraform/variables.tf`: default dataset set to `logs_webapp_us`.
 - Sink IAM uses `roles/bigquery.dataEditor` for the sink writer identity.
 
 ### Lesson Learned

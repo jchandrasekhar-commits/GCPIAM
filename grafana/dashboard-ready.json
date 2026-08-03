@@ -7,6 +7,14 @@
       "type": "datasource",
       "pluginId": "grafana-bigquery-datasource",
       "pluginName": "BigQuery"
+    },
+    {
+      "name": "DS_GCM",
+      "label": "Google Cloud Monitoring",
+      "description": "Cloud Monitoring datasource for CPU/Memory metrics",
+      "type": "datasource",
+      "pluginId": "stackdriver",
+      "pluginName": "Google Cloud Monitoring"
     }
   ],
   "annotations": {
@@ -162,14 +170,15 @@
     },
     {
       "datasource": {
-        "type": "grafana-bigquery-datasource",
-        "uid": "${DS_BQ}"
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "unit": "none"
         },
         "overrides": []
       },
@@ -192,12 +201,75 @@
       },
       "targets": [
         {
-          "format": 0,
-          "rawSql": "-- Resource/activity utilization trend. CPU/memory are true metrics sourced\n-- from Managed Prometheus (see grafana/dashboard-cloud-monitoring.json); this\n-- BigQuery panel shows throughput/log-activity per namespace as a proxy trend.\nSELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stdout_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "kubernetes.io/container/cpu/core_usage_time"],
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.namespace_name"]
+          },
           "refId": "A"
         }
       ],
-      "title": "Resource Utilization Trend (throughput proxy)",
+      "title": "Resource Utilization - Pod CPU by Namespace (vCPU)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "kubernetes.io/container/memory/used_bytes"],
+            "perSeriesAligner": "ALIGN_MEAN",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.namespace_name"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Resource Utilization - Pod Memory by Namespace",
       "type": "timeseries"
     }
   ],
@@ -234,8 +306,8 @@
       {
         "current": {
           "selected": false,
-          "text": "logs_webapp_us",
-          "value": "logs_webapp_us"
+          "text": "logs_dataset_us",
+          "value": "logs_dataset_us"
         },
         "hide": 0,
         "label": "dataset",
@@ -243,11 +315,31 @@
         "options": [
           {
             "selected": true,
-            "text": "logs_webapp_us",
-            "value": "logs_webapp_us"
+            "text": "logs_dataset_us",
+            "value": "logs_dataset_us"
           }
         ],
-        "query": "logs_webapp_us",
+        "query": "logs_dataset_us",
+        "skipUrlSync": false,
+        "type": "constant"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "project-pubsub-32009",
+          "value": "project-pubsub-32009"
+        },
+        "hide": 0,
+        "label": "gcp_project",
+        "name": "gcp_project",
+        "options": [
+          {
+            "selected": true,
+            "text": "project-pubsub-32009",
+            "value": "project-pubsub-32009"
+          }
+        ],
+        "query": "project-pubsub-32009",
         "skipUrlSync": false,
         "type": "constant"
       }
