@@ -43,7 +43,10 @@ def tally():
     return counts
 
 
+# GCE Ingress does not strip the path prefix, so the LB forwards "/b" to this
+# pod as "/b". Serve the results page on both "/" and the "/b" prefix.
 @app.route("/")
+@app.route("/b")
 def index():
     counts = tally()
     total = counts["a"] + counts["b"]

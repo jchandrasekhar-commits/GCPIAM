@@ -32,7 +32,10 @@ def get_redis():
     return g.redis
 
 
+# GCE Ingress does not strip the path prefix, so the LB forwards "/a" to this
+# pod as "/a". Serve the vote page on both "/" and the "/a" prefix.
 @app.route("/", methods=["GET", "POST"])
+@app.route("/a", methods=["GET", "POST"])
 def vote():
     voter_id = request.cookies.get("voter_id") or f"{random.getrandbits(64):x}"
     chosen = None
