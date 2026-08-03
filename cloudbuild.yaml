@@ -35,6 +35,9 @@ steps:
     kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
     kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml -f k8s/webapp-b-hpa.yaml
     kubectl apply -f k8s/worker-deployment.yaml
+    # With the :latest tag the manifest is unchanged, so `apply` alone won't roll
+    # pods onto a freshly-pushed image. Force a rollout so the new image lands.
+    kubectl rollout restart deployment/webapp-a deployment/webapp-b deployment/worker
   env:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=gke-primary'
