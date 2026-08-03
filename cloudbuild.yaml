@@ -7,16 +7,37 @@ substitutions:
   _TAG: latest
 
 steps:
-# --- Build the three service images -----------------------------------------
+# --- Build AND push each image immediately ----------------------------------
+# Push right after each build so images land in Artifact Registry even if a
+# later step (deploy) fails. (The trailing `images:` field only pushes after
+# ALL steps succeed, which hid images whenever the deploy step failed.)
 - name: 'gcr.io/cloud-builders/docker'
-  id: build-vote
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}', 'apps/vote']
+  id: vote
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    IMG="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}"
+    docker build -t "$IMG" apps/vote
+    docker push "$IMG"
 - name: 'gcr.io/cloud-builders/docker'
-  id: build-worker
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}', 'apps/worker']
+  id: worker
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    IMG="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}"
+    docker build -t "$IMG" apps/worker
+    docker push "$IMG"
 - name: 'gcr.io/cloud-builders/docker'
-  id: build-result
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}', 'apps/result']
+  id: result
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    IMG="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}"
+    docker build -t "$IMG" apps/result
+    docker push "$IMG"
 
 # --- Deploy: substitute image placeholders, then apply ----------------------
 - name: 'gcr.io/cloud-builders/kubectl'
@@ -41,11 +62,6 @@ steps:
   env:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=gke-primary'
-
-images:
-- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}'
-- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}'
-- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}'
 
 options:
   substitutionOption: ALLOW_LOOSE
