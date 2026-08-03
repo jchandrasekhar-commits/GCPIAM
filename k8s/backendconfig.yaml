@@ -11,7 +11,7 @@ spec:
     name: webapps-waf
   healthCheck:
     type: HTTP
-    requestPath: /
+    requestPath: /healthz
     port: 8080
   # Connection draining for zero-downtime rollouts.
   connectionDraining:
