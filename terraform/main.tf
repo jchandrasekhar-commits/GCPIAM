@@ -160,11 +160,7 @@ resource "google_container_cluster" "primary" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
-  # Enable the managed Secrets Store CSI driver so pods can mount Secret Manager
-  # secrets (see k8s/secretproviderclass.yaml + the vote deployment).
-  secret_manager_config {
-    enabled = true
-  }
+  # Secret Manager add-on is enabled post-create via gcloud command in README.
 
   # Google Cloud Managed Service for Prometheus (metrics) + full Cloud Logging.
   monitoring_config {
@@ -302,9 +298,7 @@ resource "google_container_cluster" "secondary" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
-  secret_manager_config {
-    enabled = true
-  }
+  # Secret Manager add-on is enabled post-create via gcloud command in README.
 
   monitoring_config {
     managed_prometheus {
@@ -436,7 +430,7 @@ resource "google_bigquery_dataset_iam_member" "sink_writer" {
 # "Centralized logging bucket or export to SIEM" requirement. From here logs
 # can also be routed onward to a SIEM via a sink to Pub/Sub.
 resource "google_logging_project_bucket_config" "central" {
-  project          = var.project_id
+  project          = "projects/${var.project_id}"
   location         = "global"
   bucket_id        = "central-logs"
   retention_days   = 90
