@@ -258,12 +258,12 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "gke-cluster-504002", "value": "gke-cluster-504002" },
+        "current": { "selected": false, "text": "project-pubsub-32009", "value": "project-pubsub-32009" },
         "hide": 0,
         "label": "project",
         "name": "project",
-        "options": [ { "selected": true, "text": "gke-cluster-504002", "value": "gke-cluster-504002" } ],
-        "query": "gke-cluster-504002",
+        "options": [ { "selected": true, "text": "project-pubsub-32009", "value": "project-pubsub-32009" } ],
+        "query": "project-pubsub-32009",
         "skipUrlSync": false,
         "type": "constant"
       },
@@ -278,12 +278,12 @@
         "type": "constant"
       },
       {
-        "current": { "selected": false, "text": "gke-cluster-504002", "value": "gke-cluster-504002" },
+        "current": { "selected": false, "text": "project-pubsub-32009", "value": "project-pubsub-32009" },
         "hide": 0,
         "label": "gcp_project",
         "name": "gcp_project",
-        "options": [ { "selected": true, "text": "gke-cluster-504002", "value": "gke-cluster-504002" } ],
-        "query": "gke-cluster-504002",
+        "options": [ { "selected": true, "text": "project-pubsub-32009", "value": "project-pubsub-32009" } ],
+        "query": "project-pubsub-32009",
         "skipUrlSync": false,
         "type": "constant"
       }

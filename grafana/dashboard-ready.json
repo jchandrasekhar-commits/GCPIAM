@@ -214,8 +214,8 @@
       {
         "current": {
           "selected": false,
-          "text": "gke-cluster-504002",
-          "value": "gke-cluster-504002"
+          "text": "project-pubsub-32009",
+          "value": "project-pubsub-32009"
         },
         "hide": 0,
         "label": "project",
@@ -223,11 +223,11 @@
         "options": [
           {
             "selected": true,
-            "text": "gke-cluster-504002",
-            "value": "gke-cluster-504002"
+            "text": "project-pubsub-32009",
+            "value": "project-pubsub-32009"
           }
         ],
-        "query": "gke-cluster-504002",
+        "query": "project-pubsub-32009",
         "skipUrlSync": false,
         "type": "constant"
       },

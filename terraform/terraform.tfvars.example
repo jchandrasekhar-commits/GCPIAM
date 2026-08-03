@@ -3,7 +3,7 @@
 # Do NOT commit a real terraform.tfvars containing secrets.
 
 # --- Required ---------------------------------------------------------------
-project_id = "project-80744ff2-3e39-47f5-a73"
+project_id = "project-pubsub-32009"
 region     = "us-central1"
 
 # --- BigQuery ---------------------------------------------------------------
