@@ -8,8 +8,10 @@ variable "region" {
 }
 
 variable "bq_dataset" {
-  type    = string
-  default = "logs_dataset_us"
+  type = string
+  # Must match the `dataset` template variable in the Grafana dashboards
+  # (grafana/*.json) so the sink writes where the dashboards read.
+  default = "logs_webapp_us"
 }
 
 variable "app_secret_value" {

@@ -7,7 +7,7 @@ project_id = "project-pubsub-32009"
 region     = "us-central1"
 
 # --- BigQuery ---------------------------------------------------------------
-bq_dataset = "logs_dataset_us"
+bq_dataset = "logs_webapp_us"
 
 # --- Secret Manager (override; do not commit real secrets) ------------------
 # app_secret_value = "your-real-secret"
