@@ -12,16 +12,21 @@ Manifests:
 
 ## 0. Connect to the cluster (every session)
 
+Terraform grants **your user** (`jchandrasekhar@gmail.com`) `roles/container.developer`
+(see [terraform/roles.tf](../terraform/roles.tf)), so connect directly — no impersonation:
+
 ```powershell
 gcloud config set project project-pubsub-32009
-
-# If your user hits a 403, connect via the CI/CD service account (impersonation):
-gcloud container clusters get-credentials gke-primary `
-  --region us-central1 --project project-pubsub-32009 `
-  --impersonate-service-account=cicd-sa@project-pubsub-32009.iam.gserviceaccount.com
-
+gcloud auth login          # sign in as jchandrasekhar@gmail.com
+gcloud container clusters get-credentials gke-primary --region us-central1 --project project-pubsub-32009
 kubectl get nodes
 ```
+
+> Do NOT use `--impersonate-service-account=cicd-sa@...`: the `cicd-sa` SA is
+> only granted build/registry/logging roles, not `container.developer`, so
+> impersonating it fails with 403. If your user still gets 403, the cluster IAM
+> hasn't propagated yet — re-run `terraform apply` and retry, or grant yourself:
+> `gcloud projects add-iam-policy-binding project-pubsub-32009 --member="user:$(gcloud config get-value account)" --role="roles/container.developer"`
 
 ---
 
