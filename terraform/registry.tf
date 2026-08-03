@@ -71,3 +71,10 @@ resource "google_project_iam_member" "compute_sa_logs_writer" {
   role    = "roles/logging.logWriter"
   member  = "serviceAccount:${data.google_project.this.number}-compute@developer.gserviceaccount.com"
 }
+
+# The deploy step (kubectl) also runs as the compute SA, so it needs GKE access.
+resource "google_project_iam_member" "compute_sa_container_developer" {
+  project = var.project_id
+  role    = "roles/container.developer"
+  member  = "serviceAccount:${data.google_project.this.number}-compute@developer.gserviceaccount.com"
+}
