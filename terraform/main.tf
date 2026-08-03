@@ -190,11 +190,11 @@ resource "google_container_node_pool" "default_pool" {
 
   autoscaling {
     min_node_count = 0
-    max_node_count = 1
+    max_node_count = 3
   }
 
   node_config {
-    machine_type = "e2-small"
+    machine_type = "e2-medium"
     disk_type    = "pd-standard"
     disk_size_gb = 30
   }
@@ -392,7 +392,7 @@ resource "google_bigquery_dataset" "logs" {
 resource "google_logging_project_sink" "to_bq" {
   name                   = "export-to-bq"
   destination            = "bigquery.googleapis.com/projects/${var.project_id}/datasets/${google_bigquery_dataset.logs.dataset_id}"
-  filter                 = "resource.type=\"k8s_container\" OR resource.type=\"http_load_balancer\""
+  filter                 = "resource.type=k8s_container OR resource.type=http_load_balancer"
   unique_writer_identity = true
 }
 

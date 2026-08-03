@@ -2,7 +2,8 @@ locals {
   dev_principals  = var.dev_principals
   ops_principals  = var.ops_principals
   sre_principals  = var.sre_principals
-  cicd_principals = ["serviceAccount:${google_service_account.cicd.email}"]
+  cicd_service_account_principals = ["serviceAccount:${google_service_account.cicd.email}"]
+  cicd_user_principals            = ["user:jchandrasekhar@gmail.com"]
 }
 
 resource "google_project_iam_binding" "dev_container_developer" {
@@ -88,35 +89,35 @@ resource "google_bigquery_dataset_iam_member" "sre_data_viewer" {
 resource "google_project_iam_binding" "cicd_cloudbuild_builder" {
   project = var.project_id
   role    = "roles/cloudbuild.builds.builder"
-  members = local.cicd_principals
+  members = local.cicd_service_account_principals
 }
 
 resource "google_project_iam_binding" "cicd_artifact_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
-  members = local.cicd_principals
+  members = local.cicd_service_account_principals
 }
 
 resource "google_project_iam_binding" "cicd_container_developer" {
   project = var.project_id
   role    = "roles/container.developer"
-  members = local.cicd_principals
+  members = local.cicd_user_principals
 }
 
 resource "google_project_iam_binding" "cicd_logging_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  members = local.cicd_principals
+  members = local.cicd_service_account_principals
 }
 
 resource "google_project_iam_binding" "cicd_monitoring_metric_writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
-  members = local.cicd_principals
+  members = local.cicd_service_account_principals
 }
 
 resource "google_service_account_iam_binding" "cicd_service_account_user" {
   service_account_id = google_service_account.app_service.name
   role               = "roles/iam.serviceAccountUser"
-  members            = local.cicd_principals
+  members            = local.cicd_user_principals
 }
