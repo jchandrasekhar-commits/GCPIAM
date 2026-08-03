@@ -1,21 +1,22 @@
 substitutions:
   _REGION: us-central1
   _REPO: webapps
+  # $SHORT_SHA is empty for manual `gcloud builds submit`, which produces an
+  # invalid image tag (":"). Use _TAG (default "latest"); a trigger can override
+  # it with --substitutions=_TAG=$SHORT_SHA.
+  _TAG: latest
 
 steps:
 # --- Build the three service images -----------------------------------------
 - name: 'gcr.io/cloud-builders/docker'
   id: build-vote
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:$SHORT_SHA',
-         '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:latest', 'apps/vote']
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}', 'apps/vote']
 - name: 'gcr.io/cloud-builders/docker'
   id: build-worker
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$SHORT_SHA',
-         '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:latest', 'apps/worker']
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}', 'apps/worker']
 - name: 'gcr.io/cloud-builders/docker'
   id: build-result
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:$SHORT_SHA',
-         '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:latest', 'apps/result']
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}', 'apps/result']
 
 # --- Deploy: substitute image placeholders, then apply ----------------------
 - name: 'gcr.io/cloud-builders/kubectl'
@@ -25,7 +26,7 @@ steps:
   - '-c'
   - |
     for f in k8s/webapp-a-deployment.yaml k8s/webapp-b-deployment.yaml k8s/worker-deployment.yaml; do
-      sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:$SHORT_SHA|g" "$f"
+      sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:${_TAG}|g" "$f"
     done
     kubectl apply -f k8s/webapp-config.yaml
     kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
@@ -36,9 +37,9 @@ steps:
   - 'CLOUDSDK_CONTAINER_CLUSTER=gke-primary'
 
 images:
-- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:$SHORT_SHA'
-- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$SHORT_SHA'
-- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:$SHORT_SHA'
+- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}'
+- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}'
+- '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}'
 
 options:
   substitutionOption: ALLOW_LOOSE
