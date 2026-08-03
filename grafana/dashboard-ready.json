@@ -72,7 +72,7 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY') OR logName LIKE '%stderr%', 1, 0) AS is_error\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  namespace AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY') OR logName LIKE '%stderr%', 1, 0) AS is_error\n  FROM `${project}.${dataset}.*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  namespace AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -112,7 +112,7 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stderr_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND COALESCE(severity, '') IN ('ERROR','CRITICAL','ALERT','EMERGENCY')\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND COALESCE(severity, '') IN ('ERROR','CRITICAL','ALERT','EMERGENCY')\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -153,7 +153,7 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "WITH log_lines AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n    COUNT(1) AS value\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  GROUP BY time, metric\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n    COUNT(1) AS value\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  GROUP BY time, metric\n)\nSELECT time, metric, SUM(value) AS value\nFROM log_lines\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "WITH log_lines AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n    COUNT(1) AS value\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  GROUP BY time, metric\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n    COUNT(1) AS value\n  FROM `${project}.${dataset}.*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  GROUP BY time, metric\n)\nSELECT time, metric, SUM(value) AS value\nFROM log_lines\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -193,7 +193,7 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stderr_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -275,8 +275,8 @@
       {
         "current": {
           "selected": false,
-          "text": "logs_dataset_us",
-          "value": "logs_dataset_us"
+          "text": "logs_webapp_us",
+          "value": "logs_webapp_us"
         },
         "hide": 0,
         "label": "dataset",
@@ -284,11 +284,11 @@
         "options": [
           {
             "selected": true,
-            "text": "logs_dataset_us",
-            "value": "logs_dataset_us"
+            "text": "logs_webapp_us",
+            "value": "logs_webapp_us"
           }
         ],
-        "query": "logs_dataset_us",
+        "query": "logs_webapp_us",
         "skipUrlSync": false,
         "type": "constant"
       }
@@ -304,3 +304,4 @@
   "version": 1,
   "weekStart": ""
 }
+
