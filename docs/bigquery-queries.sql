@@ -98,11 +98,11 @@ SELECT time, metric, value FROM log_vol ORDER BY time;
 
 
 -- 5) Request latency p50/p95/p99 (ms) from HTTP(S) load balancer request logs
--- httpRequest.latency is a duration string like '0.045s'; strip the trailing 's' and convert to ms.
+-- In this project sink schema, httpRequest.latency is FLOAT64 seconds.
 WITH latency AS (
   SELECT
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS minute_ts,
-    SAFE_CAST(REGEXP_EXTRACT(httpRequest.latency, r'([0-9.]+)s') AS FLOAT64) * 1000 AS latency_ms
+    SAFE_CAST(httpRequest.latency AS FLOAT64) * 1000 AS latency_ms
   FROM `PROJECT_ID.logs_dataset_us.requests_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))

@@ -80,11 +80,11 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY'), 1, 0) AS is_error\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    1 AS is_error\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  namespace AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.cluster_name, 'unknown-cluster') AS cluster_name,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY'), 1, 0) AS is_error\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.cluster_name, 'unknown-cluster') AS cluster_name,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    1 AS is_error\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT\n  time,\n  CONCAT(cluster_name, ' / ', namespace) AS metric,\n  SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "GKE Application Error Rate by Namespace (%)",
+      "title": "GKE Application Error Rate by Cluster/Namespace (%)",
       "type": "timeseries"
     },
     {
@@ -120,11 +120,11 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stderr_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND (textPayload LIKE '%Back-off%' OR textPayload LIKE '%Restarting%' OR textPayload LIKE '%Restarted%' OR textPayload LIKE '%CrashLoopBackOff%')\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  CONCAT(COALESCE(resource.labels.cluster_name, 'unknown-cluster'), ' / ', COALESCE(resource.labels.namespace_name, 'unknown')) AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stderr_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND (textPayload LIKE '%Back-off%' OR textPayload LIKE '%Restarting%' OR textPayload LIKE '%Restarted%' OR textPayload LIKE '%CrashLoopBackOff%')\nGROUP BY time, metric\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Pod Restart Counts by Namespace",
+      "title": "Pod Restart Counts by Cluster/Namespace",
       "type": "timeseries"
     },
     {
@@ -217,13 +217,14 @@
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
             "groupBys": [
+              "resource.label.cluster_name",
               "resource.label.namespace_name"
             ]
           },
           "refId": "A"
         }
       ],
-      "title": "Resource Utilization - Pod CPU by Namespace (vCPU)",
+      "title": "Resource Utilization - Pod CPU by Cluster/Namespace (vCPU)",
       "type": "timeseries"
     },
     {
@@ -275,13 +276,14 @@
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
             "groupBys": [
+              "resource.label.cluster_name",
               "resource.label.namespace_name"
             ]
           },
           "refId": "A"
         }
       ],
-      "title": "Resource Utilization - Pod Memory by Namespace",
+      "title": "Resource Utilization - Pod Memory by Cluster/Namespace",
       "type": "timeseries"
     }
   ],

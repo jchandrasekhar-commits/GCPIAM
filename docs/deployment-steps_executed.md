@@ -235,17 +235,18 @@ kubectl describe mci webapps-mci -n default
 gcloud logging sinks describe export-to-bq --project=project-pubsub-32009 --format="value(destination)"
 bq ls --project_id=project-pubsub-32009 logs_dataset_us
 
-# 7b. Create the read-only Grafana service account + key
+# 7b. Use keyless auth (Workload Identity) for Grafana datasource access
 $P="project-pubsub-32009"; $SA="grafana-bq-reader@$P.iam.gserviceaccount.com"
-gcloud iam service-accounts create grafana-bq-reader --project=$P --display-name="Grafana BigQuery reader"
 gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="roles/bigquery.dataViewer"
 gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="roles/bigquery.jobUser"
-gcloud iam service-accounts keys create grafana/grafana-bq-reader-key.json --iam-account=$SA
+gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="roles/monitoring.viewer"
+gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="roles/logging.viewer"
 ```
 
-Then in Grafana: add the **Google BigQuery** datasource (JWT file = the key
-above) and import `grafana/dashboard-ready.json` (maps to `project-pubsub-32009` /
-`logs_dataset_us`). Sample queries live in [bigquery-queries.sql](bigquery-queries.sql).
+Then in Grafana: add the **Google BigQuery** datasource using **GCE metadata server**
+authentication (no JSON key), set project = `project-pubsub-32009`, and import
+`grafana/dashboard-ready.json` (maps to `project-pubsub-32009` / `logs_dataset_us`).
+Sample queries live in [bigquery-queries.sql](bigquery-queries.sql).
 
 Full shutdown/startup and Grafana-via-Helm details: [k8s-shutdown-startup.md](k8s-shutdown-startup.md).
 
