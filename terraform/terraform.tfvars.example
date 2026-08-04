@@ -29,18 +29,22 @@ enable_private_nodes = true
 # master_authorized_cidrs = [
 #   { cidr_block = "203.0.113.10/32", display_name = "admin-laptop" }
 # ]
+# Replace with your admin workstation public IP or VPN egress CIDR. Never use 0.0.0.0/0.
+# Leave as [] to fully lock the endpoint (access only via Cloud Shell or bastion host).
 master_authorized_cidrs = [
-  { cidr_block = "0.0.0.0/0", display_name = "all (demo - tighten for prod)" }
+  { cidr_block = "203.0.113.0/32", display_name = "admin-workstation" }
 ]
 
-# --- IAM principals (defaults point at the repo owner) ----------------------
-# dev_principals  = ["user:you@example.com"]
-# ops_principals  = ["group:ops@example.com"]
-# sre_principals  = ["group:sre@example.com"]
+# --- IAM principals (defaults are empty; must be set explicitly) -------------
+# Use group: principals so team membership is managed in your IdP, not here.
+dev_principals       = ["group:dev-team@your-domain.com"]
+ops_principals       = ["group:ops-team@your-domain.com"]
+sre_principals       = ["group:sre-team@your-domain.com"]
+cicd_user_principals = ["user:cicd-admin@your-domain.com"]
 
 # --- Load balancer / DNS / security -----------------------------------------
-# Binary Authorization enforcement (leave false so demo images deploy).
-enable_binary_authorization = false
+# Binary Authorization: on by default. Set false only for images without attestation.
+enable_binary_authorization = true
 
 # Cloud DNS: set true only if you own the domain below.
 enable_cloud_dns = false

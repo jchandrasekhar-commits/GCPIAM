@@ -1,0 +1,114 @@
+# NetworkPolicy: restrict pod egress to only the paths each component requires.
+#
+# Data-flow paths allowed:
+#   vote (webapp-a) → Redis (Memorystore)   port 6379
+#   worker          → Redis                 port 6379
+#   worker          → PostgreSQL (Cloud SQL) port 5432
+#   result (webapp-b)→ PostgreSQL            port 5432
+#   all pods        → kube-dns              port 53 (UDP/TCP)
+#   all pods        → GCP APIs (Trace, Profiler, WI token) port 443
+#
+# Ingress is intentionally left open so GFE health-check probes
+# (130.211.0.0/22, 35.191.0.0/16) can reach vote and result pods through
+# the container-native LB (NEG).
+#
+# Apply: kubectl apply -f k8s/networkpolicy.yaml
+---
+# Default: deny ALL egress from every pod in the default namespace.
+# The allowlist policies below punch only the necessary holes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+---
+# DNS egress: every pod needs to resolve service and Memorystore/Cloud SQL hostnames.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+---
+# GCP API egress: Cloud Trace, Profiler, Error Reporting, and Workload Identity
+# token exchange all use HTTPS (443). Required by all three app components.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gcp-api-egress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 443
+      protocol: TCP
+---
+# vote → Redis (Memorystore) only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vote-to-redis
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: vote
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 6379
+      protocol: TCP
+---
+# worker → Redis (drain the vote queue) + PostgreSQL (write durable tallies).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: worker
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 6379
+      protocol: TCP
+  - ports:
+    - port: 5432
+      protocol: TCP
+---
+# result (webapp-b) → PostgreSQL only (read the vote tally).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-result-to-db
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: result
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 5432
+      protocol: TCP

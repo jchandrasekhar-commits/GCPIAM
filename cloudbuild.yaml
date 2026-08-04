@@ -1,9 +1,9 @@
 substitutions:
   _REGION: us-central1
   _REPO: webapps
-  # $SHORT_SHA is empty for manual `gcloud builds submit`, which produces an
-  # invalid image tag (":"). Use _TAG (default "latest"); a trigger can override
-  # it with --substitutions=_TAG=$SHORT_SHA.
+  # _TAG is set to $SHORT_SHA by the Cloud Build trigger (see cloudbuild-trigger.yaml),
+  # giving every image a unique, traceable 7-char commit SHA tag.
+  # For a manual build: --substitutions=_TAG=$(git rev-parse --short HEAD)
   _TAG: latest
 
 steps:
@@ -30,6 +30,29 @@ steps:
   id: push-result
   args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}']
 
+# --- Terraform plan: detect infrastructure drift before deploying -----------
+# Fails the build on Terraform errors (exit 1). Intentional pending changes
+# visible in the log do NOT block the app deployment — apply them separately
+# after review: terraform apply -var-file=terraform.tfvars
+- name: 'hashicorp/terraform:1.9'
+  id: tf-plan
+  entrypoint: 'sh'
+  args:
+  - '-c'
+  - |
+    cd terraform
+    terraform init \
+      -backend-config="bucket=$PROJECT_ID-tfstate" \
+      -backend-config="prefix=gcpiam/state" \
+      -input=false -reconfigure
+    terraform plan \
+      -var="project_id=$PROJECT_ID" \
+      -var="region=${_REGION}" \
+      -input=false \
+      -compact-warnings
+  env:
+  - 'TF_IN_AUTOMATION=1'
+
 # --- Deploy: substitute image placeholders, then apply ----------------------
 - name: 'gcr.io/cloud-builders/kubectl'
   id: deploy
@@ -50,9 +73,12 @@ steps:
     kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
     kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml -f k8s/webapp-b-hpa.yaml
     kubectl apply -f k8s/worker-deployment.yaml
-    # With the :latest tag the manifest is unchanged, so `apply` alone won't roll
-    # pods onto a freshly-pushed image. Force a rollout so the new image lands.
-    kubectl rollout restart deployment/webapp-a deployment/webapp-b deployment/worker
+    # With a unique SHA tag, kubectl apply detects the image change and triggers
+    # a rolling update automatically. Force a restart only for the :latest fallback
+    # (where the image digest is unchanged so apply alone won't cycle pods).
+    if [ "${_TAG}" = "latest" ] || [ -z "${_TAG}" ]; then
+      kubectl rollout restart deployment/webapp-a deployment/webapp-b deployment/worker
+    fi
   env:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=gke-primary'

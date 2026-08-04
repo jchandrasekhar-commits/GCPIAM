@@ -1,9 +1,9 @@
 locals {
-  dev_principals  = var.dev_principals
-  ops_principals  = var.ops_principals
-  sre_principals  = var.sre_principals
+  dev_principals                  = var.dev_principals
+  ops_principals                  = var.ops_principals
+  sre_principals                  = var.sre_principals
   cicd_service_account_principals = ["serviceAccount:${google_service_account.cicd.email}"]
-  cicd_user_principals            = ["user:jchandrasekhar@gmail.com"]
+  cicd_user_principals            = var.cicd_user_principals
 }
 
 resource "google_project_iam_binding" "dev_container_developer" {

@@ -161,3 +161,60 @@ resource "google_monitoring_alert_policy" "uptime_failure" {
 
   notification_channels = [google_monitoring_notification_channel.email[0].id]
 }
+
+# --- HTTP 5xx error rate alert -----------------------------------------------
+# Fires when the load balancer records more than 5 HTTP 5xx responses in a
+# 60-second window, sustained for 2 minutes.
+resource "google_monitoring_alert_policy" "error_rate" {
+  count        = var.uptime_alert_email == "" ? 0 : 1
+  display_name = "webapps HTTP 5xx error rate elevated"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "LB 5xx responses > 5 per minute"
+    condition_threshold {
+      filter = join(" AND ", [
+        "resource.type=\"https_lb_rule\"",
+        "metric.type=\"loadbalancing.googleapis.com/https/request_count\"",
+        "metric.label.response_code_class=\"500\"",
+      ])
+      comparison      = "COMPARISON_GT"
+      threshold_value = 5
+      duration        = "120s"
+      aggregations {
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+}
+
+# --- p99 backend latency alert -----------------------------------------------
+# Fires when the 99th-percentile backend latency reported by the load balancer
+# exceeds 2 000 ms, sustained for 2 minutes.
+resource "google_monitoring_alert_policy" "p99_latency" {
+  count        = var.uptime_alert_email == "" ? 0 : 1
+  display_name = "webapps p99 backend latency > 2 s"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "LB backend p99 latency > 2000 ms"
+    condition_threshold {
+      filter = join(" AND ", [
+        "resource.type=\"https_lb_rule\"",
+        "metric.type=\"loadbalancing.googleapis.com/https/backend_latencies\"",
+      ])
+      comparison      = "COMPARISON_GT"
+      threshold_value = 2000
+      duration        = "120s"
+      aggregations {
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_PERCENTILE_99"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+}

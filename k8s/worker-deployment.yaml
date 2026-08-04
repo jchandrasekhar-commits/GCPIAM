@@ -25,15 +25,35 @@ spec:
     spec:
       serviceAccountName: webapp-ksa
       terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: worker
         # Built + pushed by cloudbuild.yaml to Artifact Registry.
         image: us-central1-docker.pkg.dev/project-pubsub-32009/webapps/worker:latest
+        ports:
+        - containerPort: 8081
+          name: health
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          failureThreshold: 3
+          timeoutSeconds: 5
         envFrom:
         - configMapRef:
             name: webapp-config
         - secretRef:
             name: webapp-db-secret
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         resources:
           requests:
             cpu: "50m"
@@ -41,3 +61,9 @@ spec:
           limits:
             cpu: "250m"
             memory: "256Mi"
+        volumeMounts:
+        - mountPath: "/tmp"
+          name: tmp-dir
+      volumes:
+      - name: tmp-dir
+        emptyDir: {}

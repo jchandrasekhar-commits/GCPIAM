@@ -71,15 +71,19 @@ variable "master_authorized_cidrs" {
     cidr_block   = string
     display_name = string
   }))
-  default     = [{ cidr_block = "0.0.0.0/0", display_name = "all (demo - tighten for prod)" }]
-  description = "CIDRs allowed to reach the GKE control-plane API. Default is open for the demo; restrict to your admin IP in production."
+  # Empty default = no external access to the control plane; use Cloud Shell or
+  # a bastion for kubectl access. Override with your admin IP or VPN CIDR:
+  #   -var='master_authorized_cidrs=[{"cidr_block":"203.0.113.10/32","display_name":"admin-laptop"}]'
+  # Never use 0.0.0.0/0 — it exposes the Kubernetes API server to the public internet.
+  default     = []
+  description = "CIDRs allowed to reach the GKE control-plane API endpoint. Must be set to a known admin IP or VPN egress CIDR. Defaults to empty (no external access; use Cloud Shell or bastion)."
 }
 
 # --- Load balancer / DNS / security ----------------------------------------
 variable "enable_binary_authorization" {
   type        = bool
-  default     = false
-  description = "Enforce Binary Authorization (only attested images run). Off by default so the demo images still deploy without attestation."
+  default     = true
+  description = "Enforce Binary Authorization (PROJECT_SINGLETON_POLICY_ENFORCE): only attested images may run. On by default for supply-chain security. Set false only if your demo images lack attestation and you accept the risk."
 }
 
 variable "enable_cloud_dns" {

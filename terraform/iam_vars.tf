@@ -1,19 +1,30 @@
+# All team principal lists default to empty — no access is granted until you
+# supply real identifiers. This enforces meaningful separation between teams
+# and prevents accidental access. Set values in terraform.tfvars or -var flags.
+# Prefer group: principals so membership is managed in your IdP, not Terraform.
+
 variable "dev_principals" {
-  type    = list(string)
-  default = ["user:jchandrasekhar@gmail.com"]
-  description = "List of principals for the Dev team, such as user:alice@example.com or group:devs@your-domain.com."
+  type        = list(string)
+  default     = []
+  description = "Dev team principals (e.g. group:devs@your-domain.com). Receive container.developer, logging.viewer, monitoring.viewer."
 }
 
 variable "ops_principals" {
-  type    = list(string)
-  default = ["user:jchandrasekhar@gmail.com"]
-  description = "List of principals for the Ops team, such as user:bob@example.com or group:ops@your-domain.com."
+  type        = list(string)
+  default     = []
+  description = "Ops team principals (e.g. group:ops@your-domain.com). Receive container.clusterAdmin, compute.networkAdmin, logging.configWriter, monitoring.editor, BigQuery dataOwner."
 }
 
 variable "sre_principals" {
-  type    = list(string)
-  default = ["user:jchandrasekhar@gmail.com"]
-  description = "List of principals for the SRE team, such as user:carol@example.com or group:sre@your-domain.com."
+  type        = list(string)
+  default     = []
+  description = "SRE team principals (e.g. group:sre@your-domain.com). Receive logging.viewer, monitoring.viewer, container.clusterViewer, BigQuery dataViewer."
+}
+
+variable "cicd_user_principals" {
+  type        = list(string)
+  default     = []
+  description = "Human CI/CD operators who need container.developer and serviceAccountUser (e.g. user:cicd-admin@your-domain.com). The CI/CD service account is wired separately via the cicd_service_account_principals local."
 }
 
 variable "cicd_service_account_id" {

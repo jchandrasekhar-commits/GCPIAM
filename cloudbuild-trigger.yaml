@@ -1,0 +1,37 @@
+# Cloud Build push trigger — builds and deploys on every push to main.
+#
+# Import via CLI:
+#   gcloud builds triggers import --source=cloudbuild-trigger.yaml \
+#     --project=<PROJECT_ID>
+#
+# Or create manually in the Cloud Build console and set:
+#   Substitution variables:
+#     _TAG  = $SHORT_SHA   <- built-in variable; 7-char git commit SHA
+#     _REGION = us-central1
+#     _REPO   = webapps
+#
+# With _TAG=$SHORT_SHA every pushed image is tagged with the commit SHA,
+# making deployments traceable and enabling single-command rollbacks:
+#   kubectl set image deployment/webapp-a vote=<REGION>-docker.pkg.dev/<PROJECT>/<REPO>/vote:<previous-sha>
+
+name: build-and-deploy-main
+description: Build, push, and deploy vote/worker/result on push to main
+filename: cloudbuild.yaml
+includedFiles:
+  - apps/**
+  - k8s/**
+  - cloudbuild.yaml
+
+github:
+  owner: GITHUB_OWNER          # replace with your GitHub user or organisation
+  name: GITHUB_REPO            # replace with your repository name
+  push:
+    branch: ^main$
+
+substitutions:
+  _REGION: us-central1
+  _REPO: webapps
+  # $SHORT_SHA is a Cloud Build built-in variable injected at trigger runtime.
+  # It is NOT a literal string — Cloud Build expands it to the 7-char commit SHA
+  # when the trigger fires, so each image is uniquely tagged per commit.
+  _TAG: $SHORT_SHA

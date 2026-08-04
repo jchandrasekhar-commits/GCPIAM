@@ -46,11 +46,18 @@ def get_redis():
 def vote():
     voter_id = request.cookies.get("voter_id") or f"{random.getrandbits(64):x}"
     chosen = None
+    error_msg = None
     if request.method == "POST":
         chosen = request.form.get("vote")
         if chosen:
             payload = json.dumps({"voter_id": voter_id, "vote": chosen})
-            get_redis().rpush("votes", payload)
+            try:
+                get_redis().rpush("votes", payload)
+            except redis.RedisError:
+                if error_client:
+                    error_client.report_exception()
+                chosen = None
+                error_msg = "Vote service temporarily unavailable — please try again shortly."
     resp = make_response(
         render_template(
             "index.html",
@@ -58,6 +65,7 @@ def vote():
             option_b=OPTION_B,
             hostname=HOSTNAME,
             vote=chosen,
+            error=error_msg,
         )
     )
     resp.set_cookie("voter_id", voter_id)

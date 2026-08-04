@@ -19,6 +19,10 @@ spec:
     spec:
       serviceAccountName: webapp-ksa
       terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: vote
         # Built + pushed by cloudbuild.yaml to Artifact Registry.
@@ -46,6 +50,11 @@ spec:
           preStop:
             exec:
               command: ["/bin/sh", "-c", "sleep 5"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         resources:
           requests:
             cpu: "50m"
@@ -54,10 +63,14 @@ spec:
             cpu: "500m"
             memory: "256Mi"
         volumeMounts:
+        - mountPath: "/tmp"
+          name: tmp-dir
         - mountPath: "/mnt/secrets-store"
           name: secrets-store-inline
           readOnly: true
       volumes:
+      - name: tmp-dir
+        emptyDir: {}
       # Secret Manager via the GKE Secrets Store CSI driver (Workload Identity).
       - name: secrets-store-inline
         csi:

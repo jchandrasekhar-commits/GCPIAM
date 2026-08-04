@@ -9,12 +9,48 @@ Flow:  vote app -> Redis list "votes" -> [worker] -> Postgres table "votes"
 """
 import json
 import os
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import psycopg2
 import redis
 
 from telemetry import setup_error_reporting, setup_profiler, setup_tracing
+
+
+# --- Liveness health server -------------------------------------------------
+# _heartbeat[0] is updated on every BLPOP iteration (including idle timeouts).
+# /healthz returns 503 when the loop has been silent for > 60 s, giving
+# Kubernetes a reliable signal to restart a deadlocked pod.
+_heartbeat: list[float] = [0.0]  # mutable singleton; avoids a global declaration
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/healthz":
+            age = time.time() - _heartbeat[0]
+            if age < 60:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+            else:
+                self.send_response(503)
+                self.end_headers()
+                self.wfile.write(f"stale: {age:.0f}s since last loop iteration".encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, *_) -> None:  # suppress HTTP access logs
+        pass
+
+
+def start_health_server(port: int = 8081) -> None:
+    """Start a daemon-thread HTTP health server that does not block shutdown."""
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    threading.Thread(target=server.serve_forever, daemon=True, name="health-srv").start()
+    print(f"worker: health server listening on :{port}", flush=True)
 
 
 def connect_redis():
@@ -81,12 +117,15 @@ def main():
     setup_profiler("worker")
     error_client = setup_error_reporting()
 
+    start_health_server()
+
     r = connect_redis()
     conn = connect_db()
     ensure_schema(conn)
     print("worker: syncing redis -> postgres", flush=True)
     while True:
         item = r.blpop("votes", timeout=5)
+        _heartbeat[0] = time.time()  # heartbeat on every iteration, including idle
         if item is None:
             continue
         try:
