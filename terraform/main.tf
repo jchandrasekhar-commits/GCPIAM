@@ -6,6 +6,11 @@ provider "google" {
 resource "google_compute_network" "vpc" {
   name                    = "gke-vpc"
   auto_create_subnetworks = false
+
+  # Wait for the required APIs (compute.googleapis.com, etc.) to be enabled
+  # before creating any resources, otherwise the first apply fails with a 403
+  # "API not enabled" until enablement propagates.
+  depends_on = [google_project_service.enabled]
 }
 
 # --- Segregated subnets -----------------------------------------------------
@@ -111,6 +116,11 @@ resource "google_compute_firewall" "allow_internal" {
   }
 
   source_ranges = ["10.10.0.0/20", "10.20.0.0/20"]
+
+  # Firewall hit logging -> Cloud Logging (resource.type="gce_subnetwork").
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_compute_firewall" "allow_health_checks" {
@@ -123,6 +133,10 @@ resource "google_compute_firewall" "allow_health_checks" {
 
   # Google front-end / health-check probe ranges.
   source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_container_cluster" "primary" {
@@ -130,7 +144,9 @@ resource "google_container_cluster" "primary" {
   location                 = var.region
   network                  = google_compute_network.vpc.name
   subnetwork               = google_compute_subnetwork.primary_subnet.name
-  remove_default_node_pool = false
+  # Remove the auto-created pool so the managed google_container_node_pool below
+  # is the only one (avoids the "default-pool already exists" name collision).
+  remove_default_node_pool = true
   initial_node_count       = 1
   node_locations           = ["us-central1-a", "us-central1-b"]
 
@@ -143,6 +159,8 @@ resource "google_container_cluster" "primary" {
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
+
+  # Secret Manager add-on is enabled post-create via gcloud command in README.
 
   # Google Cloud Managed Service for Prometheus (metrics) + full Cloud Logging.
   monitoring_config {
@@ -267,7 +285,7 @@ resource "google_container_cluster" "secondary" {
   location                 = var.secondary_region
   network                  = google_compute_network.vpc.name
   subnetwork               = google_compute_subnetwork.secondary_subnet[0].name
-  remove_default_node_pool = false
+  remove_default_node_pool = true
   initial_node_count       = 1
   node_locations           = var.secondary_node_locations
 
@@ -279,6 +297,8 @@ resource "google_container_cluster" "secondary" {
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
+
+  # Secret Manager add-on is enabled post-create via gcloud command in README.
 
   monitoring_config {
     managed_prometheus {
@@ -386,13 +406,18 @@ resource "google_service_account" "cicd" {
 resource "google_bigquery_dataset" "logs" {
   dataset_id = var.bq_dataset
   # Use multi-region US to avoid Cloud Logging->BigQuery table_invalid_schema issues seen with regional datasets.
-  location   = "US"
+  location = "US"
+  # Allow terraform to delete the dataset even after the sink has created log
+  # tables in it (otherwise destroy/rename fails with "dataset ... is still in use").
+  delete_contents_on_destroy = true
 }
 
 resource "google_logging_project_sink" "to_bq" {
   name                   = "export-to-bq"
   destination            = "bigquery.googleapis.com/projects/${var.project_id}/datasets/${google_bigquery_dataset.logs.dataset_id}"
-  filter                 = "resource.type=k8s_container OR resource.type=http_load_balancer"
+  # Container logs (GKE agent), Ingress/LB logs, and VPC flow + firewall logs
+  # (both surface as resource.type="gce_subnetwork").
+  filter                 = "resource.type=k8s_container OR resource.type=http_load_balancer OR resource.type=gce_subnetwork"
   unique_writer_identity = true
 }
 
@@ -401,3 +426,18 @@ resource "google_bigquery_dataset_iam_member" "sink_writer" {
   role       = "roles/bigquery.dataEditor"
   member     = google_logging_project_sink.to_bq.writer_identity
 }
+
+# --- Centralized logging bucket ---------------------------------------------
+# A dedicated Log Analytics-enabled bucket with extended retention that acts as
+# the centralized store (in addition to the BigQuery export). Satisfies the
+# "Centralized logging bucket or export to SIEM" requirement. From here logs
+# can also be routed onward to a SIEM via a sink to Pub/Sub.
+resource "google_logging_project_bucket_config" "central" {
+  project          = "projects/${var.project_id}"
+  location         = "global"
+  bucket_id        = "central-logs"
+  retention_days   = 90
+  enable_analytics = true
+  description      = "Centralized log bucket (container, LB, VPC flow, firewall) with 90-day retention and Log Analytics."
+}
+

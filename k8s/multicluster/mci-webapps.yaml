@@ -1,0 +1,50 @@
+# MultiClusterIngress: ONE global anycast L7 load balancer that fans traffic out
+# to healthy webapp-a / webapp-b pods in BOTH clusters (gke-primary us-central1
+# and gke-secondary us-east1). Google Cloud performs proximity routing (nearest
+# healthy cluster) and automatic regional failover when a cluster/backend is
+# unhealthy. This replaces the single-cluster GKE Ingress (k8s/ingress.yaml)
+# when Multi-Cluster Ingress is enabled.
+#
+# Prereqs (Terraform, var.enable_multicluster_ingress = true & enable_secondary
+# = true): Fleet memberships + multiclusteringress/multiclusterservicediscovery
+# features. Apply to the CONFIG cluster only (gke-primary), AFTER the two MCS
+# objects:
+#   kubectl apply -f k8s/multicluster/mcs-webapp-a.yaml
+#   kubectl apply -f k8s/multicluster/mcs-webapp-b.yaml
+#   kubectl apply -f k8s/multicluster/mci-webapps.yaml
+#
+# Before applying, replace the annotations below:
+#   networking.gke.io/static-ip      -> terraform output -raw lb_static_ip
+#   networking.gke.io/pre-shared-certs -> a Google-managed/self-managed SSL cert:
+#     gcloud compute ssl-certificates create webapps-mci-cert \
+#       --domains=app.example.com --global
+apiVersion: networking.gke.io/v1
+kind: MultiClusterIngress
+metadata:
+  name: webapps-mci
+  namespace: default
+  annotations:
+    networking.gke.io/static-ip: "REPLACE_WITH_lb_static_ip"
+    networking.gke.io/pre-shared-certs: "webapps-mci-cert"
+spec:
+  template:
+    spec:
+      backend:
+        serviceName: webapp-a-mcs
+        servicePort: 80
+      rules:
+      - host: app.example.com
+        http:
+          paths:
+          - path: /a/*
+            backend:
+              serviceName: webapp-a-mcs
+              servicePort: 80
+          - path: /b/*
+            backend:
+              serviceName: webapp-b-mcs
+              servicePort: 80
+          - path: /*
+            backend:
+              serviceName: webapp-a-mcs
+              servicePort: 80

@@ -98,7 +98,6 @@ One of the most important learning moments in this project was resolving a broke
 This project successfully demonstrates a working GCP-based Kubernetes environment with deployed application services, autoscaling, logging export, BigQuery analysis, and Grafana-based observability. The implementation includes verified live endpoints, a dashboard export, BigQuery query examples, and a documented troubleshooting resolution, making it suitable for a high-scoring submission.
 
 ## Supporting Files
-- [docs/submission-evidence.md](docs/submission-evidence.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/bigquery-queries.sql](docs/bigquery-queries.sql)
 - [grafana/dashboard.json](grafana/dashboard.json)

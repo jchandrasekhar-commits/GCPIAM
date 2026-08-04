@@ -121,3 +121,24 @@ resource "google_service_account_iam_binding" "cicd_service_account_user" {
   role               = "roles/iam.serviceAccountUser"
   members            = local.cicd_user_principals
 }
+
+# --- App workload telemetry: let webapp-sa write traces/profiles/errors ------
+# The apps run as webapp-sa via Workload Identity and export to Cloud Trace,
+# Cloud Profiler, and Cloud Error Reporting; these are the minimal writer roles.
+resource "google_project_iam_member" "app_cloudtrace_agent" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.app_service.email}"
+}
+
+resource "google_project_iam_member" "app_cloudprofiler_agent" {
+  project = var.project_id
+  role    = "roles/cloudprofiler.agent"
+  member  = "serviceAccount:${google_service_account.app_service.email}"
+}
+
+resource "google_project_iam_member" "app_errorreporting_writer" {
+  project = var.project_id
+  role    = "roles/errorreporting.writer"
+  member  = "serviceAccount:${google_service_account.app_service.email}"
+}

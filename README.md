@@ -4,7 +4,7 @@ This workspace contains a scaffold for a GCP project with two GKE clusters, two 
 
 What I added:
 - `gcp_end_to_end_writeup.md` — architecture and commands
-- `terraform/` — Terraform for a custom-mode VPC, **segregated subnets** (GKE + alias ranges, `lb-proxy-subnet`, `ops-subnet`), **Private Service Access**, Cloud NAT, firewall rules, GKE primary cluster (Managed Prometheus, Binary Authorization), optional symmetric secondary cluster (`enable_secondary`), IAM, BigQuery dataset, logging sink, **global HTTPS load balancer static IP**, **Cloud Armor WAF**, **Cloud DNS**, and **uptime check + alerting**
+- `terraform/` — Terraform for a custom-mode VPC, **segregated subnets** (GKE + alias ranges, `lb-proxy-subnet`, `ops-subnet`), **Private Service Access**, Cloud NAT, firewall rules, GKE primary cluster (Managed Prometheus, Binary Authorization), symmetric secondary cluster (`enable_secondary`, on by default), **Multi-Cluster Ingress + Multi-Cluster Services via GKE Fleet** (`enable_multicluster_ingress`), IAM, BigQuery dataset, logging sink, **global HTTPS load balancer static IP**, **Cloud Armor WAF**, **Cloud DNS**, and **uptime check + alerting**
 - `k8s/` — manifests for `webapp-a`/`webapp-b`, HPAs, ConfigMap/Secret, an Ingress plus **BackendConfig (Cloud Armor + NEG health check)**, **FrontendConfig (HTTP→HTTPS)**, and **ManagedCertificate** for the global external HTTPS load balancer
 - `cloudbuild.yaml` — sample CI to build/push and deploy `webapp-a`
 - `grafana/dashboard.json` — Grafana dashboard with 4 BigQuery-backed panels
@@ -28,9 +28,10 @@ terraform init
 terraform apply -var='project_id=<PROJECT_ID>' -var='region=us-central1'
 ```
 
-To also provision the symmetric secondary (DR) cluster, add `-var='enable_secondary=true'`
-(defaults: `secondary_region=us-east1`, `secondary_subnet_cidr=10.20.0.0/20`). It is off by
-default to stay within the free tier.
+Two GKE clusters are provisioned by default (the assignment requires it): the primary
+(`gke-primary`, `us-central1`) and a symmetric secondary/DR cluster (`gke-secondary`,
+`us-east1`, `secondary_subnet_cidr=10.20.0.0/20`). To run a single, cheaper cluster
+instead, add `-var='enable_secondary=false'`.
 
 3. Configure kubectl for the created cluster:
 
@@ -72,6 +73,24 @@ terraform -chdir=terraform output lb_static_ip
 ```
 
 6. To test the Load Balancer deployment and WAF locally without modifying DNS, check out [docs/test-curl-commands.md](docs/test-curl-commands.md) for curl override commands.
+
+### Optional: global Multi-Cluster Ingress across both clusters (MCI/MCS)
+
+The single-cluster Ingress above only serves `gke-primary`. To serve traffic from
+**both** clusters behind one global anycast LB with automatic regional failover,
+enable Multi-Cluster Ingress + Multi-Cluster Services (requires the secondary cluster):
+
+```powershell
+terraform -chdir=terraform apply -var='project_id=<PROJECT_ID>' `
+  -var='enable_secondary=true' -var='enable_multicluster_ingress=true'
+
+# Replicate the workloads to BOTH clusters and apply the MCS/MCI objects
+# (fill the static IP + pre-shared cert placeholders in k8s/multicluster/mci-webapps.yaml first):
+./scripts/deploy-multicluster.ps1 -ProjectId <PROJECT_ID>
+
+# Status of the global multi-cluster LB:
+kubectl describe mci webapps-mci -n default
+```
 
 ## IAM Roles
 This repo includes role mappings for Dev, Ops, SRE, and CI/CD access.
@@ -179,7 +198,7 @@ Once Grafana is running and the LoadBalancer IP is assigned, open `http://<GRAFA
 2. Add BigQuery datasource.
 3. Import dashboard JSON from `grafana/dashboard.json`.
 4. Set constants:
-	 - `project = project-80744ff2-3e39-47f5-a73`
+	 - `project = project-pubsub-32009`
 	 - `dataset = logs_dataset_us`
 5. Ensure panels show data.
 6. Capture a screenshot with all 4 panels visible.

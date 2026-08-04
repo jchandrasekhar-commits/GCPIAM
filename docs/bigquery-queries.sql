@@ -1,7 +1,7 @@
 -- BigQuery log analysis queries for Logging sink exports.
 -- These queries assume date-sharded tables like stdout_* and stderr_*.
--- The current sink output in this workspace does not contain events_* or requests_* tables.
--- Query 5 (latency) now uses nginx access logs emitted by the proxy sidecar to stdout.
+-- The sink also exports HTTP(S) load balancer request logs to a date-sharded requests_* table.
+-- Query 5 (latency) uses the load balancer requests_* table (httpRequest.latency) for real p50/p95/p99.
 -- CPU/memory utilization is best sourced from Managed Prometheus metrics, not only Logging exports.
 
 -- Common suffix filter pattern in each query:
@@ -97,14 +97,16 @@ WITH log_vol AS (
 SELECT time, metric, value FROM log_vol ORDER BY time;
 
 
--- 5) Request latency p50/p95/p99 (ms) from nginx proxy logs
+-- 5) Request latency p50/p95/p99 (ms) from HTTP(S) load balancer request logs
+-- httpRequest.latency is a duration string like '0.045s'; strip the trailing 's' and convert to ms.
 WITH latency AS (
   SELECT
     TIMESTAMP_TRUNC(timestamp, MINUTE) AS minute_ts,
-    SAFE_CAST(REGEXP_EXTRACT(textPayload, r'request_time=([0-9.]+)') AS FLOAT64) * 1000 AS latency_ms
-  FROM `PROJECT_ID.logs_dataset_us.stdout_*`
+    SAFE_CAST(REGEXP_EXTRACT(httpRequest.latency, r'([0-9.]+)s') AS FLOAT64) * 1000 AS latency_ms
+  FROM `PROJECT_ID.logs_dataset_us.requests_*`
   WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))
     AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))
+    AND httpRequest.latency IS NOT NULL
 ), q AS (
   SELECT
     minute_ts,

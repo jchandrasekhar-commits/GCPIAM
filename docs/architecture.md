@@ -1,7 +1,13 @@
 # GKE DevOps Architecture
 
 ## Overview
-This design uses a primary GKE Standard cluster (`gke-primary`, `us-central1`) plus a symmetric secondary cluster (`gke-secondary`, `us-east1`) for multi-region high availability. The secondary is defined in Terraform and provisioned on demand via the `enable_secondary` variable (default `false` to stay within the free tier). Traffic enters through DNS and a global HTTP(S) load balancer, reaches GKE ingress, and is routed to two application services.
+This design uses a primary GKE Standard cluster (`gke-primary`, `us-central1`) plus a symmetric secondary cluster (`gke-secondary`, `us-east1`) for multi-region high availability. Both clusters are provisioned by default via the `enable_secondary` variable (default `true`); set it to `false` for a single-cluster deploy. Traffic enters through DNS and a global HTTP(S) load balancer, reaches GKE ingress, and is routed to two application services.
+
+### Global traffic: single-cluster Ingress vs. Multi-Cluster Ingress (MCI)
+There are two mutually exclusive front-door options:
+
+- **Single-cluster GKE Ingress** (`k8s/ingress.yaml`, default): one global HTTPS LB whose backends are only `gke-primary` pods.
+- **Multi-Cluster Ingress + Multi-Cluster Services** (`k8s/multicluster/`, enable with `enable_multicluster_ingress=true`): registers both clusters into a **GKE Fleet** and programs one global anycast LB that fans out to healthy `webapp-a`/`webapp-b` pods in **both** clusters, with proximity routing and automatic **regional failover**. Deploy the workloads to both clusters with `scripts/deploy-multicluster.ps1`. This satisfies requirement §4 (MCI/MCS) and cross-cluster app replication.
 
 ## Mermaid Diagram
 ```mermaid
@@ -30,12 +36,15 @@ flowchart LR
     ING --> SB --> PB
   end
 
-  subgraph GKE_SECONDARY["GKE Cluster: gke-secondary (us-east1, enable_secondary)"]
-    ING2[Ingress]
-    S2[Services]
-    P2[Pods]
-    ING2 --> S2 --> P2
+  subgraph GKE_SECONDARY["GKE Cluster: gke-secondary (us-east1)"]
+    S2[Services webapp-a/b]
+    P2[Pods webapp-a/b]
+    S2 --> P2
   end
+
+  %% Multi-Cluster Ingress (enable_multicluster_ingress=true) fans the same
+  %% global LB out to healthy pods in BOTH clusters with regional failover.
+  NEG -. "MCI/MCS" .-> S2
 
   PA --> NAT[Cloud NAT]
   PB --> NAT

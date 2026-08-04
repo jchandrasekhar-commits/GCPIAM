@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="5" />
+  <title>Results — {{ option_a }} vs {{ option_b }}</title>
+  <style>
+    body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+    .card { background: #1e293b; padding: 40px; border-radius: 16px; width: 480px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+    h1 { margin: 0 0 24px; font-size: 22px; text-align: center; }
+    .bar { display: flex; height: 56px; border-radius: 10px; overflow: hidden; font-weight: 700; }
+    .a { background: #4285F4; display: flex; align-items: center; justify-content: center; transition: width .5s; }
+    .b { background: #FF9900; display: flex; align-items: center; justify-content: center; transition: width .5s; }
+    .totals { margin-top: 20px; display: flex; justify-content: space-between; font-size: 15px; }
+    .total { margin-top: 16px; text-align: center; color: #64748b; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Live Results — {{ option_a }} vs {{ option_b }}</h1>
+    <div class="bar">
+      <div class="a" style="width: {{ pct_a }}%">{{ pct_a }}%</div>
+      <div class="b" style="width: {{ pct_b }}%">{{ pct_b }}%</div>
+    </div>
+    <div class="totals">
+      <span>{{ option_a }}: {{ a }}</span>
+      <span>{{ option_b }}: {{ b }}</span>
+    </div>
+    <p class="total">{{ total }} vote(s) counted · auto-refreshes every 5s</p>
+  </div>
+</body>
+</html>

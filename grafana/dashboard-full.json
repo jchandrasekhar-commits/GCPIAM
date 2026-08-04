@@ -1,0 +1,298 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_BQ",
+      "label": "BigQuery",
+      "description": "Grafana BigQuery datasource (log-based panels)",
+      "type": "datasource",
+      "pluginId": "grafana-bigquery-datasource",
+      "pluginName": "BigQuery"
+    },
+    {
+      "name": "DS_GCM",
+      "label": "Google Cloud Monitoring",
+      "description": "Google Cloud Monitoring datasource (native metric panels)",
+      "type": "datasource",
+      "pluginId": "stackdriver",
+      "pluginName": "Google Cloud Monitoring"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Log Analytics (BigQuery)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${DS_BQ}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 1, "showPoints": "never" }, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "format": 0,
+          "rawSql": "WITH src AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    IF(severity IN ('ERROR','CRITICAL','ALERT','EMERGENCY'), 1, 0) AS is_error\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  UNION ALL\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    COALESCE(resource.labels.namespace_name, 'unknown') AS namespace,\n    1 AS is_error\n  FROM `${project}.${dataset}.stderr_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n)\nSELECT time, namespace AS metric, SAFE_DIVIDE(SUM(is_error), COUNT(1)) * 100 AS value\nFROM src\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Application Error Rate by Namespace (%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${DS_BQ}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "format": 0,
+          "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n  COALESCE(resource.labels.namespace_name, 'unknown') AS metric,\n  COUNT(1) AS value\nFROM `${project}.${dataset}.stderr_*`\nWHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n  AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n  AND (textPayload LIKE '%Back-off%' OR textPayload LIKE '%Restarting%' OR textPayload LIKE '%Restarted%' OR textPayload LIKE '%CrashLoopBackOff%')\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Pod Restart Counts by Namespace",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${DS_BQ}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "format": 0,
+          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    SAFE_CAST(REGEXP_EXTRACT(textPayload, r'request_time=([0-9.]+)') AS FLOAT64) * 1000 AS latency_ms\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n    AND textPayload LIKE '%request_time=%'\n), q AS (\n  SELECT time, APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM latency WHERE latency_ms IS NOT NULL GROUP BY time\n)\nSELECT time, 'p50 (Median)' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL SELECT time, 'p95 (Degraded)' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL SELECT time, 'p99 (Outliers)' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Request Latency Percentiles (p50/p95/p99) (ms)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 101,
+      "title": "Resource & Node Metrics (Cloud Monitoring)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "kubernetes.io/container/cpu/core_usage_time"],
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.namespace_name"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Pod CPU Usage by Namespace (vCPU)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "kubernetes.io/container/memory/used_bytes"],
+            "perSeriesAligner": "ALIGN_MEAN",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.namespace_name"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Pod Memory Usage by Namespace",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "kubernetes.io/node/cpu/allocatable_utilization"],
+            "perSeriesAligner": "ALIGN_MEAN",
+            "crossSeriesReducer": "REDUCE_MEAN",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.node_name"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Node Health - CPU Allocatable Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "kubernetes.io/container/uptime"],
+            "perSeriesAligner": "ALIGN_MEAN",
+            "crossSeriesReducer": "REDUCE_COUNT",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.namespace_name"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Running Pods (HPA Scaling Effect)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 102,
+      "title": "Ingress / Load Balancer Metrics (Cloud Monitoring)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "id": 8,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "loadbalancing.googleapis.com/https/request_count"],
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["metric.label.response_code_class"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "LB Request Volume by Response Code Class (2xx/4xx/5xx)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "id": 9,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "${gcp_project}",
+            "filters": ["metric.type", "=", "loadbalancing.googleapis.com/https/total_latencies"],
+            "perSeriesAligner": "ALIGN_PERCENTILE_95",
+            "crossSeriesReducer": "REDUCE_MEAN",
+            "alignmentPeriod": "cloud-monitoring-auto",
+            "groupBys": ["resource.label.url_map_name"]
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "LB Total Latency (p95)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["gke", "bigquery", "cloud-monitoring", "observability"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "project-pubsub-32009", "value": "project-pubsub-32009" },
+        "hide": 0,
+        "label": "project",
+        "name": "project",
+        "options": [ { "selected": true, "text": "project-pubsub-32009", "value": "project-pubsub-32009" } ],
+        "query": "project-pubsub-32009",
+        "skipUrlSync": false,
+        "type": "constant"
+      },
+      {
+        "current": { "selected": false, "text": "logs_dataset_us", "value": "logs_dataset_us" },
+        "hide": 0,
+        "label": "dataset",
+        "name": "dataset",
+        "options": [ { "selected": true, "text": "logs_dataset_us", "value": "logs_dataset_us" } ],
+        "query": "logs_dataset_us",
+        "skipUrlSync": false,
+        "type": "constant"
+      },
+      {
+        "current": { "selected": false, "text": "project-pubsub-32009", "value": "project-pubsub-32009" },
+        "hide": 0,
+        "label": "gcp_project",
+        "name": "gcp_project",
+        "options": [ { "selected": true, "text": "project-pubsub-32009", "value": "project-pubsub-32009" } ],
+        "query": "project-pubsub-32009",
+        "skipUrlSync": false,
+        "type": "constant"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "GKE Full Observability (Logs + Metrics + LB)",
+  "uid": "gke-full-observability",
+  "version": 1,
+  "weekStart": ""
+}

@@ -3,7 +3,7 @@
 # Do NOT commit a real terraform.tfvars containing secrets.
 
 # --- Required ---------------------------------------------------------------
-project_id = "project-80744ff2-3e39-47f5-a73"
+project_id = "project-pubsub-32009"
 region     = "us-central1"
 
 # --- BigQuery ---------------------------------------------------------------
@@ -12,11 +12,16 @@ bq_dataset = "logs_dataset_us"
 # --- Secret Manager (override; do not commit real secrets) ------------------
 # app_secret_value = "your-real-secret"
 
-# --- Secondary (DR) cluster: off by default to stay in the free tier --------
-enable_secondary         = false
+# --- Secondary (DR) cluster: on by default to satisfy the two-cluster req ----
+enable_secondary         = true
 secondary_region         = "us-east1"
 secondary_node_locations = ["us-east1-b", "us-east1-c"]
 secondary_subnet_cidr    = "10.20.0.0/20"
+
+# --- Multi-Cluster Ingress + Multi-Cluster Services (global LB, failover) ----
+# Requires enable_secondary = true. Registers both clusters into a GKE Fleet and
+# enables MCI/MCS. After apply, run scripts/deploy-multicluster.ps1.
+enable_multicluster_ingress = false
 
 # --- Private cluster hardening ----------------------------------------------
 enable_private_nodes = true
@@ -34,7 +39,7 @@ master_authorized_cidrs = [
 # sre_principals  = ["group:sre@example.com"]
 
 # --- Load balancer / DNS / security -----------------------------------------
-# Binary Authorization enforcement (leave false so demo hello-app deploys).
+# Binary Authorization enforcement (leave false so demo images deploy).
 enable_binary_authorization = false
 
 # Cloud DNS: set true only if you own the domain below.
@@ -44,3 +49,10 @@ app_hostname     = "app.example.com"   # must match k8s ManagedCertificate + Ing
 
 # Uptime alerting: set an email to create a notification channel + alert policy.
 uptime_alert_email = ""
+
+# --- Web App B backing services (Cloud SQL HA + Memorystore + Pub/Sub) -------
+# Off by default to stay in the free tier. Enabling provisions a regional (HA)
+# Cloud SQL instance with automated backups/PITR, a Memorystore Redis HA cache,
+# and a Pub/Sub topic + subscription.
+enable_stateful_services = false
+# db_password = "set-a-real-password-here"

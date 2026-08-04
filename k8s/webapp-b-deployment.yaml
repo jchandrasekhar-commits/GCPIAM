@@ -1,9 +1,11 @@
+# Web Application B - Results frontend. Reads the vote tally from Cloud SQL.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: webapp-b
   labels:
     app: webapp-b
+    role: result
 spec:
   replicas: 2
   selector:
@@ -13,28 +15,31 @@ spec:
     metadata:
       labels:
         app: webapp-b
+        role: result
     spec:
       serviceAccountName: webapp-ksa
-      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
       containers:
-      - name: webapp-b
-        image: gcr.io/google-samples/hello-app:1.0
+      - name: result
+        # Built + pushed by cloudbuild.yaml to Artifact Registry.
+        image: REGION-docker.pkg.dev/PROJECT_ID/webapps/result:latest
         ports:
-        - containerPort: 8081
-        env:
-        - name: PORT
-          value: "8081"
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: webapp-config
+        - secretRef:
+            name: webapp-db-secret
         readinessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 3
         livenessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
@@ -45,21 +50,8 @@ spec:
               command: ["/bin/sh", "-c", "sleep 5"]
         resources:
           requests:
-            cpu: "25m"
-            memory: "64Mi"
-          limits:
-            cpu: "250m"
+            cpu: "50m"
             memory: "128Mi"
-      - name: webapp-proxy
-        image: nginx:1.27-alpine
-        ports:
-        - containerPort: 8080
-        command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf"]
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/nginx.conf
-          subPath: nginx.conf
-      volumes:
-      - name: nginx-config
-        configMap:
-          name: webapp-nginx-config
+          limits:
+            cpu: "500m"
+            memory: "256Mi"

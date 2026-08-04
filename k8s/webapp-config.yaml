@@ -1,6 +1,9 @@
-# Non-secret application configuration for the web apps.
-# Demonstrates the "config stored in ConfigMaps" requirement. Injected into the
-# webapp-a container via envFrom (see k8s/webapp-a-deployment.yaml).
+# Non-secret application configuration for the voting app (vote / worker / result).
+# Injected via envFrom in the deployments. The REDIS_HOST and DB_HOST values are
+# placeholders - after `terraform apply -var enable_stateful_services=true`, set
+# them from the outputs:
+#   terraform output webapp_b_redis_host     -> REDIS_HOST
+#   terraform output webapp_b_sql_private_ip -> DB_HOST
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,15 +13,27 @@ data:
   APP_ENV: "assignment"
   APP_REGION: "us-central1"
   LOG_LEVEL: "info"
-  FEATURE_GREETING: "Hello from webapp via ConfigMap"
+  # Ballot options
+  OPTION_A: "GCP"
+  OPTION_B: "AWS"
+  # Memorystore (Redis) - fast write path / cache for the vote app
+  REDIS_HOST: "REDIS_HOST_IP"
+  REDIS_PORT: "6379"
+  # Cloud SQL (PostgreSQL) - durable store read by the result app
+  DB_HOST: "DB_PRIVATE_IP"
+  DB_PORT: "5432"
+  DB_NAME: "webappb"
+  DB_USER: "webappb"
 ---
-# Example Secret for sensitive config (placeholder values only; real secrets
-# should come from Secret Manager via Workload Identity, not committed here).
+# Database password for the app user. Placeholder only - in production this is
+# sourced from Secret Manager via Workload Identity (see k8s/secretproviderclass.yaml
+# and the google_secret_manager_secret in terraform/main.tf). Must match
+# var.db_password used by the Cloud SQL user in terraform/stateful.tf.
 apiVersion: v1
 kind: Secret
 metadata:
-  name: webapp-secret
+  name: webapp-db-secret
   namespace: default
 type: Opaque
 stringData:
-  API_TOKEN: "replace-me-via-secret-manager"
+  DB_PASSWORD: "replace-me-with-var.db_password"

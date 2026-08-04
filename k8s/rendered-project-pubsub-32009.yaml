@@ -1,0 +1,292 @@
+# =============================================================================
+# Fully-rendered manifests for project-pubsub-32009 (region us-central1).
+# All PROJECT_ID / REGION / image placeholders are already substituted, so you
+# can apply this whole file at once, or paste sections into the GKE Console
+# (Workloads / Config Maps & Secrets / Services & Ingress -> Create -> YAML).
+#
+#   kubectl apply -f k8s/rendered-project-pubsub-32009.yaml
+#
+# BEFORE APPLYING: set the three runtime values marked "SET ME" below from:
+#   terraform -chdir=terraform output webapp_b_redis_host      -> REDIS_HOST
+#   terraform -chdir=terraform output webapp_b_sql_private_ip  -> DB_HOST
+#   (DB_PASSWORD must match var.db_password used in terraform)
+# =============================================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-config
+  namespace: default
+data:
+  APP_ENV: "assignment"
+  APP_REGION: "us-central1"
+  LOG_LEVEL: "info"
+  OPTION_A: "GCP"
+  OPTION_B: "AWS"
+  REDIS_HOST: "SET_ME_redis_host"   # <-- terraform output webapp_b_redis_host
+  REDIS_PORT: "6379"
+  DB_HOST: "SET_ME_sql_private_ip"  # <-- terraform output webapp_b_sql_private_ip
+  DB_PORT: "5432"
+  DB_NAME: "webappb"
+  DB_USER: "webappb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webapp-db-secret
+  namespace: default
+type: Opaque
+stringData:
+  DB_PASSWORD: "SET_ME_db_password"  # <-- must match var.db_password
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: webapp-ksa
+  namespace: default
+  annotations:
+    iam.gke.io/gcp-service-account: webapp-sa@project-pubsub-32009.iam.gserviceaccount.com
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: gcp-secrets-provider
+  namespace: default
+spec:
+  provider: gke
+  parameters:
+    secrets: |
+      - resourceName: "projects/project-pubsub-32009/secrets/webapp-api-token/versions/latest"
+        fileName: "API_KEY"
+---
+# Web Application A - Vote frontend (GCP vs AWS). Writes votes to Redis.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-a
+  labels:
+    app: webapp-a
+    role: vote
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp-a
+  template:
+    metadata:
+      labels:
+        app: webapp-a
+        role: vote
+    spec:
+      serviceAccountName: webapp-ksa
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: vote
+        image: us-central1-docker.pkg.dev/project-pubsub-32009/webapps/vote:latest
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: webapp-config
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        volumeMounts:
+        - mountPath: "/mnt/secrets-store"
+          name: secrets-store-inline
+          readOnly: true
+      volumes:
+      - name: secrets-store-inline
+        csi:
+          driver: secrets-store-gke.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: "gcp-secrets-provider"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-a
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "webapps-backendconfig"}'
+spec:
+  selector:
+    app: webapp-a
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: NodePort
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-a-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webapp-a
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+---
+# Web Application B - Results frontend. Reads the vote tally from Cloud SQL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-b
+  labels:
+    app: webapp-b
+    role: result
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp-b
+  template:
+    metadata:
+      labels:
+        app: webapp-b
+        role: result
+    spec:
+      serviceAccountName: webapp-ksa
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: result
+        image: us-central1-docker.pkg.dev/project-pubsub-32009/webapps/result:latest
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: webapp-config
+        - secretRef:
+            name: webapp-db-secret
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-b
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "webapps-backendconfig"}'
+spec:
+  selector:
+    app: webapp-b
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: NodePort
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-b-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webapp-b
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+---
+# Worker (3rd service) - drains Redis and writes the tally to Cloud SQL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app: worker
+    role: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: worker
+        role: worker
+    spec:
+      serviceAccountName: webapp-ksa
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: worker
+        image: us-central1-docker.pkg.dev/project-pubsub-32009/webapps/worker:latest
+        envFrom:
+        - configMapRef:
+            name: webapp-config
+        - secretRef:
+            name: webapp-db-secret
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "256Mi"

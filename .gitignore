@@ -12,4 +12,6 @@ coverage/
 
 # Local/sensitive artifacts
 keys.json
+grafana/grafana-bq-reader-key.json
 docs/final
+docs/interview-prep.md

@@ -275,8 +275,8 @@
       {
         "current": {
           "selected": false,
-          "text": "logs_webapp_us",
-          "value": "logs_webapp_us"
+          "text": "logs_dataset_us",
+          "value": "logs_dataset_us"
         },
         "hide": 0,
         "label": "dataset",
@@ -284,11 +284,11 @@
         "options": [
           {
             "selected": true,
-            "text": "logs_webapp_us",
-            "value": "logs_webapp_us"
+            "text": "logs_dataset_us",
+            "value": "logs_dataset_us"
           }
         ],
-        "query": "logs_webapp_us",
+        "query": "logs_dataset_us",
         "skipUrlSync": false,
         "type": "constant"
       }

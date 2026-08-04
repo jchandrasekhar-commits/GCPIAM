@@ -1,15 +1,60 @@
-steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/$PROJECT_ID/webapp-a:$SHORT_SHA', '.']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/$PROJECT_ID/webapp-a:$SHORT_SHA']
-- name: 'gcr.io/cloud-builders/kubectl'
-  args: ['apply', '-f', 'k8s/webapp-a-deployment.yaml']
-  env:
-  - 'CLOUDSDK_COMPUTE_REGION=$REGION'
+substitutions:
+  _REGION: us-central1
+  _REPO: webapps
+  # $SHORT_SHA is empty for manual `gcloud builds submit`, which produces an
+  # invalid image tag (":"). Use _TAG (default "latest"); a trigger can override
+  # it with --substitutions=_TAG=$SHORT_SHA.
+  _TAG: latest
 
-images:
-- 'gcr.io/$PROJECT_ID/webapp-a:$SHORT_SHA'
+steps:
+# --- Build AND push each image immediately ----------------------------------
+# Push right after each build so images land in Artifact Registry even if a
+# later step (deploy) fails. Plain arg arrays use only Cloud Build
+# substitutions (no shell vars, which would need $$ escaping).
+- name: 'gcr.io/cloud-builders/docker'
+  id: build-vote
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}', 'apps/vote']
+- name: 'gcr.io/cloud-builders/docker'
+  id: push-vote
+  args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/vote:${_TAG}']
+- name: 'gcr.io/cloud-builders/docker'
+  id: build-worker
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}', 'apps/worker']
+- name: 'gcr.io/cloud-builders/docker'
+  id: push-worker
+  args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:${_TAG}']
+- name: 'gcr.io/cloud-builders/docker'
+  id: build-result
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}', 'apps/result']
+- name: 'gcr.io/cloud-builders/docker'
+  id: push-result
+  args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/result:${_TAG}']
+
+# --- Deploy: substitute image placeholders, then apply ----------------------
+- name: 'gcr.io/cloud-builders/kubectl'
+  id: deploy
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    # entrypoint: bash bypasses the kubectl builder's auto get-credentials
+    # wrapper, so fetch cluster credentials explicitly first. Shell variables
+    # are escaped as $$ so Cloud Build does not treat them as substitutions.
+    gcloud container clusters get-credentials gke-primary --region ${_REGION} --project $PROJECT_ID
+    for f in k8s/webapp-a-deployment.yaml k8s/webapp-b-deployment.yaml k8s/worker-deployment.yaml; do
+      sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:${_TAG}|g" "$$f"
+    done
+    kubectl apply -f k8s/webapp-config.yaml
+    kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
+    kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml -f k8s/webapp-b-hpa.yaml
+    kubectl apply -f k8s/worker-deployment.yaml
+    # With the :latest tag the manifest is unchanged, so `apply` alone won't roll
+    # pods onto a freshly-pushed image. Force a rollout so the new image lands.
+    kubectl rollout restart deployment/webapp-a deployment/webapp-b deployment/worker
+  env:
+  - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=gke-primary'
 
 options:
   substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY

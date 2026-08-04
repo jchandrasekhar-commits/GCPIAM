@@ -1,7 +1,7 @@
 # Enable the Google Cloud APIs required by this configuration. Kept with
 # disable_on_destroy = false so `terraform destroy` does not disrupt other
 # workloads that may share the project. These complement the APIs enabled
-# manually via `gcloud services enable ...` in docs/Steps.txt.
+# manually via `gcloud services enable ...` in docs/deployment-steps.md.
 locals {
   required_services = [
     "compute.googleapis.com",
@@ -18,6 +18,15 @@ locals {
     "cloudprofiler.googleapis.com",     # Cloud Profiler
     "clouderrorreporting.googleapis.com",
     "binaryauthorization.googleapis.com",
+    "sqladmin.googleapis.com",  # Cloud SQL (Web App B)
+    "redis.googleapis.com",     # Memorystore for Redis (Web App B)
+    "pubsub.googleapis.com",    # Pub/Sub (Web App B)
+    "artifactregistry.googleapis.com", # container images (vote/worker/result)
+    "cloudbuild.googleapis.com",       # CI: build/push the three images
+    "gkehub.googleapis.com",                        # GKE Fleet (register both clusters)
+    "multiclusteringress.googleapis.com",           # Multi-Cluster Ingress (global L7)
+    "multiclusterservicediscovery.googleapis.com",  # Multi-Cluster Services (cross-cluster east-west)
+    "trafficdirector.googleapis.com",               # data plane used by MCS/MCI
   ]
 }
 

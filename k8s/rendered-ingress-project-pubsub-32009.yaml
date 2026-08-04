@@ -1,0 +1,92 @@
+# =============================================================================
+# Public HTTPS exposure for the voting app (project-pubsub-32009).
+#   Global external HTTPS LB  -> reserved static IP "webapps-lb-ip"
+#   Cloud Armor WAF           -> "webapps-waf" (via BackendConfig)
+#   Managed TLS certificate   -> "webapps-cert"
+#   HTTP -> HTTPS redirect     -> FrontendConfig
+#   Container-native routing   -> Service NEGs (already on webapp-a/webapp-b)
+#
+# The host "LB_IP.sslip.io" is a placeholder. sslip.io resolves <ip>.sslip.io
+# to <ip>, so a Google-managed cert can be issued without owning a domain.
+# Render + apply (PowerShell):
+#   $ip = terraform -chdir=terraform output -raw lb_static_ip
+#   (Get-Content k8s/rendered-ingress-project-pubsub-32009.yaml) `
+#     -replace 'LB_IP', $ip | kubectl apply -f -
+#
+# Then watch the cert go Active (10-30 min):
+#   kubectl get managedcertificate webapps-cert -w
+# =============================================================================
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: webapps-backendconfig
+  namespace: default
+spec:
+  securityPolicy:
+    name: webapps-waf            # Cloud Armor policy (terraform/loadbalancer.tf)
+  healthCheck:
+    type: HTTP
+    requestPath: /healthz        # both apps return 200 here without deps
+    port: 8080
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+    sampleRate: 1.0
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: webapps-frontendconfig
+  namespace: default
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: webapps-cert
+  namespace: default
+spec:
+  domains:
+    - LB_IP.sslip.io
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapps-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "webapps-lb-ip"
+    networking.gke.io/managed-certificates: "webapps-cert"
+    networking.gke.io/v1beta1.FrontendConfig: "webapps-frontendconfig"
+spec:
+  rules:
+  - host: LB_IP.sslip.io
+    http:
+      paths:
+      - path: /a
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-a
+            port:
+              number: 80
+      - path: /b
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-b
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-a
+            port:
+              number: 80
