@@ -5,6 +5,10 @@ resource "google_artifact_registry_repository" "webapps" {
   repository_id = "webapps"
   format        = "DOCKER"
   description   = "Container images for the voting app (vote, worker, result)."
+
+  # Ensure artifactregistry.googleapis.com is enabled before creating the repo,
+  # otherwise the first apply fails with a 403 "API not enabled" race.
+  depends_on = [google_project_service.enabled]
 }
 
 # GKE nodes run as the default compute service account; grant it pull access.
