@@ -2,6 +2,18 @@
 
 This workspace contains a scaffold for a GCP project with two GKE clusters, two sample web applications, observability, and CI. It's designed to be educational: run the steps, inspect resources, and learn concepts as you go.
 
+## Required Evidence References
+
+Use this section for submission/audit-ready evidence pointers:
+
+- Working cluster and accessible application endpoints (HTTP 200 evidence): [docs/deployment-steps_executed.md](docs/deployment-steps_executed.md#10-evidence-capture-grafana-dashboard--application-hits)
+- Grafana dashboard screenshot evidence: [docs/GrafanaDashboard.png](docs/GrafanaDashboard.png)
+- Grafana importable dashboard JSONs:
+	- [grafana/dashboard-ready.json](grafana/dashboard-ready.json)
+	- [grafana/dashboard-full.json](grafana/dashboard-full.json)
+- Sample BigQuery log-analysis queries: [docs/bigquery-queries.sql](docs/bigquery-queries.sql)
+- Troubleshooting scenario and resolution summary: [docs/final-submission-summary.md](docs/final-submission-summary.md#4-troubleshooting-scenario-and-resolution)
+
 What I added:
 - `gcp_end_to_end_writeup.md` — architecture and commands
 - `terraform/` — Terraform for a custom-mode VPC, **segregated subnets** (GKE + alias ranges, `lb-proxy-subnet`, `ops-subnet`), **Private Service Access**, Cloud NAT, firewall rules, GKE primary cluster (Managed Prometheus, Binary Authorization), symmetric secondary cluster (`enable_secondary`, on by default), **Multi-Cluster Ingress + Multi-Cluster Services via GKE Fleet** (`enable_multicluster_ingress`), IAM, BigQuery dataset, logging sink, **global HTTPS load balancer static IP**, **Cloud Armor WAF**, **Cloud DNS**, and **uptime check + alerting**
