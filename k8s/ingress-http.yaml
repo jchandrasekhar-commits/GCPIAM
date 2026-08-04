@@ -1,0 +1,51 @@
+# HTTP-only ingress for when you do NOT own a domain (IP-only access).
+#
+# A Google-managed TLS certificate requires a hostname, so with only a raw IP
+# there is no HTTPS: this Ingress serves the apps over plain HTTP on the
+# reserved global static IP "webapps-lb-ip". No ManagedCertificate and no
+# HTTP->HTTPS FrontendConfig redirect are attached.
+#
+# Cloud Armor WAF + the /healthz health check still apply, because they come
+# from the BackendConfig referenced by the webapp-a / webapp-b Services.
+#
+# Apply order:
+#   kubectl apply -f backendconfig.yaml
+#   kubectl apply -f webapp-a-service.yaml -f webapp-b-service.yaml
+#   kubectl apply -f ingress-http.yaml
+#
+# Then browse to  http://<lb_static_ip>/   (get it from: terraform output -raw lb_static_ip)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapps-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    # Reserved global static IP (terraform output: lb_static_ip).
+    kubernetes.io/ingress.global-static-ip-name: "webapps-lb-ip"
+spec:
+  rules:
+  # No host match -> the rule applies to requests for the bare IP.
+  - http:
+      paths:
+      - path: /a
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-a
+            port:
+              number: 80
+      - path: /b
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-b
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-a
+            port:
+              number: 80

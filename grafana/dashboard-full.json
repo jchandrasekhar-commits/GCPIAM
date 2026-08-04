@@ -21,7 +21,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -39,17 +42,53 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "title": "Log Analytics (BigQuery)",
       "type": "row"
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${DS_BQ}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 1, "showPoints": "never" }, "unit": "percent" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
           "format": 0,
@@ -61,11 +100,35 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${DS_BQ}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
       "id": 2,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
           "format": 0,
@@ -77,11 +140,36 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${DS_BQ}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "${DS_BQ}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
       "id": 3,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
           "format": 0,
@@ -94,28 +182,67 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
       "id": 101,
       "title": "Resource & Node Metrics (Cloud Monitoring)",
       "type": "row"
     },
     {
-      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
       "id": 4,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "kubernetes.io/container/cpu/core_usage_time"],
+            "filters": [
+              "metric.type",
+              "=",
+              "kubernetes.io/container/cpu/core_usage_time"
+            ],
             "perSeriesAligner": "ALIGN_RATE",
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.namespace_name"]
+            "groupBys": [
+              "resource.label.namespace_name"
+            ]
           },
           "refId": "A"
         }
@@ -124,22 +251,56 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "bytes" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
       "id": 5,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "kubernetes.io/container/memory/used_bytes"],
+            "filters": [
+              "metric.type",
+              "=",
+              "kubernetes.io/container/memory/used_bytes"
+            ],
             "perSeriesAligner": "ALIGN_MEAN",
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.namespace_name"]
+            "groupBys": [
+              "resource.label.namespace_name"
+            ]
           },
           "refId": "A"
         }
@@ -148,22 +309,56 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "percentunit" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
       "id": 6,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "kubernetes.io/node/cpu/allocatable_utilization"],
+            "filters": [
+              "metric.type",
+              "=",
+              "kubernetes.io/node/cpu/allocatable_utilization"
+            ],
             "perSeriesAligner": "ALIGN_MEAN",
             "crossSeriesReducer": "REDUCE_MEAN",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.node_name"]
+            "groupBys": [
+              "resource.label.node_name"
+            ]
           },
           "refId": "A"
         }
@@ -172,22 +367,56 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
       "id": 7,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "kubernetes.io/container/uptime"],
+            "filters": [
+              "metric.type",
+              "=",
+              "kubernetes.io/container/uptime"
+            ],
             "perSeriesAligner": "ALIGN_MEAN",
             "crossSeriesReducer": "REDUCE_COUNT",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.namespace_name"]
+            "groupBys": [
+              "resource.label.namespace_name"
+            ]
           },
           "refId": "A"
         }
@@ -197,28 +426,67 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
       "id": 102,
       "title": "Ingress / Load Balancer Metrics (Cloud Monitoring)",
       "type": "row"
     },
     {
-      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
       "id": 8,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "loadbalancing.googleapis.com/https/request_count"],
+            "filters": [
+              "metric.type",
+              "=",
+              "loadbalancing.googleapis.com/https/request_count"
+            ],
             "perSeriesAligner": "ALIGN_RATE",
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["metric.label.response_code_class"]
+            "groupBys": [
+              "metric.label.response_code_class"
+            ]
           },
           "refId": "A"
         }
@@ -227,22 +495,56 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
       "id": 9,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "stackdriver", "uid": "${DS_GCM}" },
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "loadbalancing.googleapis.com/https/total_latencies"],
+            "filters": [
+              "metric.type",
+              "=",
+              "loadbalancing.googleapis.com/https/total_latencies"
+            ],
             "perSeriesAligner": "ALIGN_PERCENTILE_95",
             "crossSeriesReducer": "REDUCE_MEAN",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.url_map_name"]
+            "groupBys": [
+              "resource.label.url_map_name"
+            ]
           },
           "refId": "A"
         }
@@ -254,42 +556,80 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "style": "dark",
-  "tags": ["gke", "bigquery", "cloud-monitoring", "observability"],
+  "tags": [
+    "gke",
+    "bigquery",
+    "cloud-monitoring",
+    "observability"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "project-pubsub-32009", "value": "project-pubsub-32009" },
+        "current": {
+          "selected": false,
+          "text": "project-pubsub-32009",
+          "value": "project-pubsub-32009"
+        },
         "hide": 0,
         "label": "project",
         "name": "project",
-        "options": [ { "selected": true, "text": "project-pubsub-32009", "value": "project-pubsub-32009" } ],
+        "options": [
+          {
+            "selected": true,
+            "text": "project-pubsub-32009",
+            "value": "project-pubsub-32009"
+          }
+        ],
         "query": "project-pubsub-32009",
         "skipUrlSync": false,
         "type": "constant"
       },
       {
-        "current": { "selected": false, "text": "logs_dataset_us", "value": "logs_dataset_us" },
+        "current": {
+          "selected": false,
+          "text": "logs_dataset_us",
+          "value": "logs_dataset_us"
+        },
         "hide": 0,
         "label": "dataset",
         "name": "dataset",
-        "options": [ { "selected": true, "text": "logs_dataset_us", "value": "logs_dataset_us" } ],
+        "options": [
+          {
+            "selected": true,
+            "text": "logs_dataset_us",
+            "value": "logs_dataset_us"
+          }
+        ],
         "query": "logs_dataset_us",
         "skipUrlSync": false,
         "type": "constant"
       },
       {
-        "current": { "selected": false, "text": "project-pubsub-32009", "value": "project-pubsub-32009" },
+        "current": {
+          "selected": false,
+          "text": "project-pubsub-32009",
+          "value": "project-pubsub-32009"
+        },
         "hide": 0,
         "label": "gcp_project",
         "name": "gcp_project",
-        "options": [ { "selected": true, "text": "project-pubsub-32009", "value": "project-pubsub-32009" } ],
+        "options": [
+          {
+            "selected": true,
+            "text": "project-pubsub-32009",
+            "value": "project-pubsub-32009"
+          }
+        ],
         "query": "project-pubsub-32009",
         "skipUrlSync": false,
         "type": "constant"
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timezone": "browser",
   "title": "GKE Full Observability (Logs + Metrics + LB)",
   "uid": "gke-full-observability",

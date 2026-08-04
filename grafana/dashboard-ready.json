@@ -208,11 +208,17 @@
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "kubernetes.io/container/cpu/core_usage_time"],
+            "filters": [
+              "metric.type",
+              "=",
+              "kubernetes.io/container/cpu/core_usage_time"
+            ],
             "perSeriesAligner": "ALIGN_RATE",
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.namespace_name"]
+            "groupBys": [
+              "resource.label.namespace_name"
+            ]
           },
           "refId": "A"
         }
@@ -260,11 +266,17 @@
           "queryType": "timeSeriesList",
           "timeSeriesList": {
             "projectName": "${gcp_project}",
-            "filters": ["metric.type", "=", "kubernetes.io/container/memory/used_bytes"],
+            "filters": [
+              "metric.type",
+              "=",
+              "kubernetes.io/container/memory/used_bytes"
+            ],
             "perSeriesAligner": "ALIGN_MEAN",
             "crossSeriesReducer": "REDUCE_SUM",
             "alignmentPeriod": "cloud-monitoring-auto",
-            "groupBys": ["resource.label.namespace_name"]
+            "groupBys": [
+              "resource.label.namespace_name"
+            ]
           },
           "refId": "A"
         }
@@ -355,4 +367,3 @@
   "version": 1,
   "weekStart": ""
 }
-

@@ -128,30 +128,87 @@ kubectl rollout restart deployment/worker deployment/webapp-a deployment/webapp-
 
 ---
 
-## 5. Expose through the global external HTTPS load balancer
+## 5. Expose through the global external load balancer (no domain)
+
+You don't need a domain. **Pick ONE of the two options below** — both create the
+same `webapps-ingress`, so running both at once conflicts. Both are kept in this
+doc so you can choose per test.
+
+| | **Option A** | **Option B** |
+|---|---|---|
+| Protocol | HTTP (no TLS) | HTTPS (TLS) |
+| Domain needed | No | No (uses `sslip.io`) |
+| TLS certificate | None | Google-managed, auto-issued |
+| Ready in | ~5–10 min | ~10–30 min (cert must go Active) |
+| App URL | `http://<IP>/` | `https://<IP>.sslip.io/` |
+| Manifest | `k8s/ingress-http.yaml` | `k8s/rendered-ingress-project-pubsub-32009.yaml` |
+| Best for | Quick smoke test | Demo that shows working HTTPS |
+
+> Why the difference? A Google-managed TLS cert must be issued to a **hostname**,
+> never a bare IP. Option A skips TLS entirely. Option B borrows a free hostname
+> from `sslip.io` (the host `<ip>.sslip.io` simply resolves back to `<ip>`), which
+> gives the cert something to attach to — no domain purchase required.
+
+### Option A — HTTP, IP only (simplest)
+
+Serves the apps over plain **HTTP** on the reserved global static IP
+`webapps-lb-ip`. There is no TLS. Cloud Armor WAF + the `/healthz` check still
+apply (they come from the BackendConfig on the Services).
+Manifest: [k8s/ingress-http.yaml](../k8s/ingress-http.yaml).
 
 ```powershell
-# Replace the app.example.com placeholder with your real hostname in both the
-# managed cert and the ingress BEFORE applying, otherwise the certificate never
-# goes Active and the ingress serves the wrong host.
-$HOST="app.yourapp.com"
-(Get-Content k8s/managedcertificate.yaml) -replace 'app\.example\.com', $HOST | Set-Content k8s/managedcertificate.yaml
-(Get-Content k8s/ingress.yaml)          -replace 'app\.example\.com', $HOST | Set-Content k8s/ingress.yaml
-
 kubectl apply -f k8s/secretproviderclass.yaml
 kubectl apply -f k8s/backendconfig.yaml       # Cloud Armor WAF + /healthz health check
-kubectl apply -f k8s/frontendconfig.yaml      # HTTP -> HTTPS redirect
-kubectl apply -f k8s/managedcertificate.yaml
 kubectl apply -f k8s/webapp-a-service.yaml
 kubectl apply -f k8s/webapp-b-service.yaml
-kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/ingress-http.yaml
 
-# Point DNS A record at the reserved IP
-terraform -chdir=terraform output -raw lb_static_ip
-# Watch the ingress get an address + the managed cert go Active (can take 10-20 min)
+# Get the LB IP and browse to it (provisioning the LB can take 5-10 min)
+$ip = terraform -chdir=terraform output -raw lb_static_ip
 kubectl describe ingress webapps-ingress
-kubectl describe managedcertificate webapps-cert
+Write-Host "http://$ip/     (webapp-a)"
+Write-Host "http://$ip/b    (webapp-b)"
 ```
+
+### Option B — HTTPS via `sslip.io` (no domain purchase)
+
+Serves the apps over **HTTPS** at `https://<IP>.sslip.io/` with a Google-managed
+certificate. Apply [k8s/rendered-ingress-project-pubsub-32009.yaml](../k8s/rendered-ingress-project-pubsub-32009.yaml)
+with `LB_IP` replaced by the static IP. Do **not** also apply
+`ingress-http.yaml` — both create the same `webapps-ingress`.
+
+```powershell
+# 0. Point kubectl at the primary cluster
+gcloud container clusters get-credentials gke-primary --region us-central1 --project <PROJECT_ID>
+
+# 1. Prereqs the rendered manifest references
+kubectl apply -f k8s/secretproviderclass.yaml
+kubectl apply -f k8s/webapp-a-service.yaml
+kubectl apply -f k8s/webapp-b-service.yaml
+
+# 2. Grab the reserved static IP
+$ip = terraform -chdir=terraform output -raw lb_static_ip
+Write-Host "LB IP = $ip   ->   host will be $ip.sslip.io"
+
+# 3. Render LB_IP -> the real IP and apply the ingress bundle
+#    (BackendConfig + FrontendConfig + ManagedCertificate + Ingress)
+(Get-Content k8s/rendered-ingress-project-pubsub-32009.yaml) `
+  -replace 'LB_IP', $ip | kubectl apply -f -
+
+# 4. Wait for the LB address + managed cert to go Active (10-30 min)
+kubectl describe ingress webapps-ingress
+kubectl get managedcertificate webapps-cert -w    # Ctrl+C once Status = Active
+
+# 5. Test
+Write-Host "https://$ip.sslip.io/     (webapp-a / vote)"
+Write-Host "https://$ip.sslip.io/b    (webapp-b / result)"
+curl.exe -ik "https://$ip.sslip.io/"
+curl.exe -ik "https://$ip.sslip.io/b"
+```
+
+> The cert stays `Provisioning` until the ingress has its IP and the backends are
+> `HEALTHY`; `curl` returns TLS errors until then. `-k` skips cert validation so
+> you can test early — drop it once Status = Active.
 
 Local test without DNS: see [test-curl-commands.md](test-curl-commands.md).
 
