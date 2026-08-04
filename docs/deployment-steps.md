@@ -20,6 +20,14 @@ gcloud auth login
 gcloud auth application-default login
 gcloud config set project <PROJECT_ID>
 gcloud auth configure-docker us-central1-docker.pkg.dev
+
+# Bootstrap APIs required before the FIRST terraform apply. Terraform enables
+# the full API set (see terraform/services.tf), but it cannot enable APIs until
+# Service Usage + Resource Manager are themselves on, so enable these first.
+gcloud services enable `
+  serviceusage.googleapis.com `
+  cloudresourcemanager.googleapis.com `
+  --project=<PROJECT_ID>
 ```
 
 ---
@@ -62,6 +70,12 @@ gcloud builds submit --config cloudbuild.yaml `
 The Cloud Build config also deploys the workloads to `gke-primary`. To deploy
 manually instead, use steps 3–6.
 
+> Order matters: `webapp-a` mounts a Secret Manager volume via the CSI driver,
+> so the Secret Manager add-on (step 3) and `secretproviderclass.yaml` (step 5)
+> must exist **before** the apps are deployed. If you rely on Cloud Build here,
+> run step 3 first, or the vote pods stay in `ContainerCreating` on the missing
+> `gcp-secrets-provider` SecretProviderClass.
+
 ---
 
 ## 3. Connect kubectl to the primary cluster
@@ -94,6 +108,13 @@ kubectl apply -f k8s/pdb.yaml
 kubectl get pods -o wide
 ```
 
+> Default path (`enable_stateful_services=false`): there is no Redis/Cloud SQL,
+> so `worker` and `webapp-b` stay in `CrashLoopBackOff` and `webapp-a` cannot
+> record votes — this is expected. `webapp-a` still serves the ballot page and
+> passes health checks, so the endpoint is usable for the demo. For a fully
+> working vote path, apply with `-var='enable_stateful_services=true'` in step 1
+> and run the patch below.
+
 If the worker logs `waiting for redis/postgres`, inject the backing-service
 connection details (requires `enable_stateful_services=true`):
 
@@ -110,13 +131,20 @@ kubectl rollout restart deployment/worker deployment/webapp-a deployment/webapp-
 ## 5. Expose through the global external HTTPS load balancer
 
 ```powershell
+# Replace the app.example.com placeholder with your real hostname in both the
+# managed cert and the ingress BEFORE applying, otherwise the certificate never
+# goes Active and the ingress serves the wrong host.
+$HOST="app.yourapp.com"
+(Get-Content k8s/managedcertificate.yaml) -replace 'app\.example\.com', $HOST | Set-Content k8s/managedcertificate.yaml
+(Get-Content k8s/ingress.yaml)          -replace 'app\.example\.com', $HOST | Set-Content k8s/ingress.yaml
+
 kubectl apply -f k8s/secretproviderclass.yaml
 kubectl apply -f k8s/backendconfig.yaml       # Cloud Armor WAF + /healthz health check
 kubectl apply -f k8s/frontendconfig.yaml      # HTTP -> HTTPS redirect
-kubectl apply -f k8s/managedcertificate.yaml  # edit the domain first
+kubectl apply -f k8s/managedcertificate.yaml
 kubectl apply -f k8s/webapp-a-service.yaml
 kubectl apply -f k8s/webapp-b-service.yaml
-kubectl apply -f k8s/ingress.yaml             # edit host first
+kubectl apply -f k8s/ingress.yaml
 
 # Point DNS A record at the reserved IP
 terraform -chdir=terraform output -raw lb_static_ip
@@ -135,6 +163,10 @@ Requires `-var='enable_secondary=true' -var='enable_multicluster_ingress=true'`
 in step 1. Do NOT run this together with the single-cluster `k8s/ingress.yaml`.
 
 ```powershell
+# Enable the Secret Manager add-on on the SECOND cluster too (the primary was
+# done in step 3); the replicated webapp-a mounts the same CSI secret there.
+gcloud container clusters update gke-secondary --region us-east1 --project <PROJECT_ID> --enable-secret-manager
+
 # Fill the placeholders in k8s/multicluster/mci-webapps.yaml first:
 #   networking.gke.io/static-ip        -> terraform output -raw lb_static_ip
 #   networking.gke.io/pre-shared-certs -> create a cert:
