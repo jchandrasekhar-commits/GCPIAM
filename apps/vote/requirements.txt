@@ -8,5 +8,7 @@ opentelemetry-exporter-gcp-trace==1.7.0
 opentelemetry-propagator-gcp==1.7.0
 opentelemetry-instrumentation-flask==0.48b0
 opentelemetry-instrumentation-redis==0.48b0
-google-cloud-profiler==4.1.0
+# Native extension: no Windows wheels. Skipped on Windows (telemetry.py guards
+# the missing import); installed in the Linux container image.
+google-cloud-profiler==4.1.0; platform_system != "Windows"
 google-cloud-error-reporting==1.11.1
