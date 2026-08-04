@@ -12,3 +12,5 @@ opentelemetry-instrumentation-psycopg2==0.48b0
 # the missing import); installed in the Linux container image.
 google-cloud-profiler==4.1.0; platform_system != "Windows"
 google-cloud-error-reporting==1.11.1
+# Some telemetry deps still import pkg_resources at runtime.
+setuptools<81

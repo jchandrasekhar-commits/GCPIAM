@@ -252,9 +252,87 @@ gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="
 gcloud iam service-accounts keys create grafana/grafana-bq-reader-key.json --iam-account=$SA
 ```
 
-Then in Grafana: add the **Google BigQuery** datasource (JWT file = the key
-above) and import `grafana/dashboard-ready.json` (maps to `<PROJECT_ID>` /
-`logs_dataset_us`). Sample queries live in [bigquery-queries.sql](bigquery-queries.sql).
+If key creation fails with `constraints/iam.disableServiceAccountKeyCreation`,
+use keyless auth (Workload Identity) instead:
+
+```powershell
+# Ensure cluster credentials are active first.
+gcloud container clusters get-credentials gke-primary --region us-central1 --project <PROJECT_ID>
+
+# Map Grafana KSA -> GSA (no JSON key file required).
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+kubectl create serviceaccount grafana -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+gcloud iam service-accounts add-iam-policy-binding $SA `
+  --project=<PROJECT_ID> `
+  --role="roles/iam.workloadIdentityUser" `
+  --member="serviceAccount:<PROJECT_ID>.svc.id.goog[monitoring/grafana]"
+kubectl annotate serviceaccount grafana -n monitoring `
+  iam.gke.io/gcp-service-account=$SA --overwrite
+```
+
+### 7c. Install/access Grafana
+
+If Grafana is not running yet, install it once in the cluster:
+
+```powershell
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm upgrade --install grafana grafana/grafana -n monitoring --create-namespace `
+  --set serviceAccount.create=false `
+  --set serviceAccount.name=grafana
+
+# Get initial admin password
+kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
+
+# Local access (recommended)
+kubectl port-forward -n monitoring svc/grafana 3000:80
+```
+
+Open http://localhost:3000 and sign in with user `admin` and the password from
+the secret command above.
+
+### 7d. Add the BigQuery datasource in Grafana
+
+In Grafana UI:
+
+1. Go to **Connections -> Data sources -> Add data source**.
+2. Choose **Google BigQuery**.
+3. Authentication:
+  - **JWT file** when `grafana/grafana-bq-reader-key.json` was created successfully, or
+  - **GCE metadata server** when using Workload Identity (recommended if key creation is blocked).
+4. For JWT mode, upload key file: `grafana/grafana-bq-reader-key.json`.
+5. Default project: `<PROJECT_ID>`.
+6. Click **Save & test** (must show success).
+
+### 7e. Import dashboard
+
+Import this dashboard first (it is aligned with current logs and latency fields):
+
+- `grafana/dashboard-ready.json`
+
+Optional advanced board (includes additional infra panels):
+
+- `grafana/dashboard-full.json`
+
+When importing, select the BigQuery datasource you created above.
+
+### 7f. Verify panels are returning data
+
+Use these checks if a panel is empty:
+
+1. Dashboard time range: set to **Last 1 hour**.
+2. Dashboard variables:
+  - `project = <PROJECT_ID>`
+  - `dataset = logs_dataset_us`
+3. Confirm request logs exist:
+
+```powershell
+bq query --use_legacy_sql=false --project_id=<PROJECT_ID> 'SELECT timestamp, httpRequest.requestUrl, httpRequest.status, httpRequest.latency FROM `<PROJECT_ID>.logs_dataset_us.requests_20260804` ORDER BY timestamp DESC LIMIT 5'
+```
+
+4. Latency panel should populate from `requests_*` and `httpRequest.latency`.
+
+Sample ad-hoc queries live in [bigquery-queries.sql](bigquery-queries.sql).
 
 Full shutdown/startup and Grafana-via-Helm details: [k8s-shutdown-startup.md](k8s-shutdown-startup.md).
 

@@ -44,7 +44,9 @@ steps:
     for f in k8s/webapp-a-deployment.yaml k8s/webapp-b-deployment.yaml k8s/worker-deployment.yaml; do
       sed -i "s|REGION-docker.pkg.dev/PROJECT_ID|${_REGION}-docker.pkg.dev/$PROJECT_ID|g; s|:latest|:${_TAG}|g" "$$f"
     done
-    kubectl apply -f k8s/webapp-config.yaml
+    # Do not re-apply placeholder config/secret values from webapp-config.yaml.
+    # This file contains template defaults (REDIS_HOST_IP / DB_PRIVATE_IP / placeholder
+    # DB password) that can overwrite live runtime settings after Terraform output patching.
     kubectl apply -f k8s/webapp-a-deployment.yaml -f k8s/webapp-a-service.yaml -f k8s/webapp-a-hpa.yaml
     kubectl apply -f k8s/webapp-b-deployment.yaml -f k8s/webapp-b-service.yaml -f k8s/webapp-b-hpa.yaml
     kubectl apply -f k8s/worker-deployment.yaml

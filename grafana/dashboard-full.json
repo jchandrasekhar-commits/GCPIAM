@@ -173,11 +173,11 @@
       "targets": [
         {
           "format": 0,
-          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    SAFE_CAST(REGEXP_EXTRACT(textPayload, r'request_time=([0-9.]+)') AS FLOAT64) * 1000 AS latency_ms\n  FROM `${project}.${dataset}.stdout_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n    AND textPayload LIKE '%request_time=%'\n), q AS (\n  SELECT time, APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM latency WHERE latency_ms IS NOT NULL GROUP BY time\n)\nSELECT time, 'p50 (Median)' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL SELECT time, 'p95 (Degraded)' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL SELECT time, 'p99 (Outliers)' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
+          "rawSql": "WITH latency AS (\n  SELECT\n    TIMESTAMP_TRUNC(timestamp, MINUTE) AS time,\n    SAFE_CAST(httpRequest.latency AS FLOAT64) * 1000 AS latency_ms\n  FROM `${project}.${dataset}.requests_*`\n  WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__from)))\n    AND FORMAT_DATE('%Y%m%d', DATE(TIMESTAMP_MILLIS($__to)))\n    AND httpRequest.latency IS NOT NULL\n), q AS (\n  SELECT\n    time,\n    APPROX_QUANTILES(latency_ms, 100) AS p\n  FROM latency\n  WHERE latency_ms IS NOT NULL\n  GROUP BY time\n)\nSELECT time, 'p50 (Median)' AS metric, p[OFFSET(50)] AS value FROM q\nUNION ALL\nSELECT time, 'p95 (Degraded)' AS metric, p[OFFSET(95)] AS value FROM q\nUNION ALL\nSELECT time, 'p99 (Outliers)' AS metric, p[OFFSET(99)] AS value FROM q\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Request Latency Percentiles (p50/p95/p99) (ms)",
+      "title": "Request Latency Percentiles (p50/p95/p99) - LB (ms)",
       "type": "timeseries"
     },
     {

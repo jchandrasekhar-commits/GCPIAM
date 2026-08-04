@@ -22,7 +22,7 @@ spec:
       containers:
       - name: result
         # Built + pushed by cloudbuild.yaml to Artifact Registry.
-        image: REGION-docker.pkg.dev/PROJECT_ID/webapps/result:latest
+        image: us-central1-docker.pkg.dev/project-pubsub-32009/webapps/result:latest
         ports:
         - containerPort: 8080
         envFrom:
