@@ -14,6 +14,8 @@ import time
 import psycopg2
 import redis
 
+from telemetry import setup_error_reporting, setup_profiler, setup_tracing
+
 
 def connect_redis():
     while True:
@@ -74,6 +76,11 @@ def process(conn, entry):
 
 
 def main():
+    # Observability: distributed tracing (Cloud Trace), profiling, error reporting.
+    setup_tracing("worker")
+    setup_profiler("worker")
+    error_client = setup_error_reporting()
+
     r = connect_redis()
     conn = connect_db()
     ensure_schema(conn)
@@ -86,6 +93,11 @@ def main():
             process(conn, json.loads(item[1]))
         except Exception as exc:  # noqa: BLE001 - keep the loop alive on bad rows
             print(f"worker: error processing vote ({exc})", flush=True)
+            if error_client is not None:
+                try:
+                    error_client.report_exception()
+                except Exception:  # noqa: BLE001
+                    pass
             conn.rollback()
 
 

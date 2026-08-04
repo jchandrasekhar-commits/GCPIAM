@@ -501,7 +501,7 @@ bq show --format=prettyjson --project_id=project-80744ff2-3e39-47f5-a73 logs_dat
 - Files edited to capture the work and commands run:
   - `gcp_end_to_end_writeup.md` — added this chronological log and earlier Sink troubleshooting section
   - `README.md` — added `Commands run (diagnostics)` summary
-  - `docs/Steps.txt` — appended chronological commands and quick fixes
+  - `docs/deployment-steps.md` — end-to-end runbook (supersedes earlier scratch notes)
 
 7) Next recommended actions (pick one):
 

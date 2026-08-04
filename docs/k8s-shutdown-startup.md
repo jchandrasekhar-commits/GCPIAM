@@ -129,6 +129,110 @@ terraform -chdir=terraform apply  -var project_id=project-pubsub-32009
 
 ---
 
+## 4. Grafana: BigQuery datasource + dashboard import
+
+The dashboard panels query BigQuery, so Grafana needs a **GCP service account**
+with read access. The intended account is `grafana-bq-reader` (matches the
+placeholder key file `grafana/grafana-bq-reader-key.json`).
+
+### 4a0. Verify logs are flowing to BigQuery (do this first)
+
+```powershell
+# Where does the log sink write? (expect ...datasets/logs_dataset_us)
+gcloud logging sinks describe export-to-bq --project=project-pubsub-32009 --format="value(destination)"
+
+# Date-sharded tables show up a few minutes after pods log
+# (expect stdout_* for logs and requests_* for HTTP(S) load balancer request logs)
+bq ls --project_id=project-pubsub-32009 logs_dataset_us
+
+# Sanity query - proves the error-rate / log-volume panels will return rows
+bq query --use_legacy_sql=false --project_id=project-pubsub-32009 `
+  "SELECT COUNT(1) AS lines FROM \`project-pubsub-32009.logs_dataset_us.stdout_*\` WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', CURRENT_DATE())"
+
+# Sanity query - proves the latency panel will return rows (LB request logs, httpRequest.latency)
+bq query --use_legacy_sql=false --project_id=project-pubsub-32009 `
+  "SELECT COUNT(1) AS lines FROM \`project-pubsub-32009.logs_dataset_us.requests_*\` WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', CURRENT_DATE()) AND httpRequest.latency IS NOT NULL"
+```
+
+### 4a. Create the read-only service account + key
+
+```powershell
+$P = "project-pubsub-32009"
+$SA = "grafana-bq-reader@$P.iam.gserviceaccount.com"
+
+gcloud iam service-accounts create grafana-bq-reader `
+  --project=$P --display-name="Grafana BigQuery reader"
+
+# Read data + run query jobs (least privilege)
+gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="roles/bigquery.dataViewer"
+gcloud projects add-iam-policy-binding $P --member="serviceAccount:$SA" --role="roles/bigquery.jobUser"
+
+# Key file for the Grafana datasource (do NOT commit it)
+gcloud iam service-accounts keys create grafana/grafana-bq-reader-key.json --iam-account=$SA
+```
+
+> Security: `grafana/grafana-bq-reader-key.json` is a real credential — add it to
+> `.gitignore` and never commit it. The tracked copy in the repo is an empty
+> placeholder only.
+
+### 4b. Add the BigQuery datasource in Grafana
+
+Grafana → **Connections → Data sources → Add data source → Google BigQuery**:
+- Authentication: **Google JWT File** → upload `grafana-bq-reader-key.json`
+- Default project: `project-pubsub-32009`
+- Save & test.
+
+### 4c. Import the dashboard
+
+Grafana → **Dashboards → New → Import → Upload JSON** → `grafana/dashboard-ready.json`
+→ map the **DS_BQ** input to the BigQuery datasource → **Import**. It is preset to
+`project-pubsub-32009` / `logs_dataset_us`; set the time range to **Last 6h**.
+
+> `dashboard-full.json` additionally needs a **Google Cloud Monitoring** datasource
+> (for the CPU/mem/LB metric panels). The 4 required log panels are in
+> `dashboard-ready.json`.
+
+---
+
+## 5. Troubleshooting
+
+### Worker: "waiting for redis ... Name or service not known"
+`REDIS_HOST`/`DB_HOST` are unset placeholders or the backing services don't exist.
+
+```powershell
+# Do the backing services exist? (null = not provisioned -> apply with enable_stateful_services=true)
+terraform -chdir=terraform output webapp_b_redis_host
+terraform -chdir=terraform output webapp_b_sql_private_ip
+
+# What did the pods actually get?
+kubectl get configmap webapp-config -o jsonpath='{.data.REDIS_HOST}{"  "}{.data.DB_HOST}{"\n"}'
+
+# Fix: inject the real private IPs and restart
+$redis = terraform -chdir=terraform output -raw webapp_b_redis_host
+$sql   = terraform -chdir=terraform output -raw webapp_b_sql_private_ip
+kubectl patch configmap webapp-config --type merge -p "{""data"":{""REDIS_HOST"":""$redis"",""DB_HOST"":""$sql""}}"
+kubectl patch secret    webapp-db-secret --type merge -p "{""stringData"":{""DB_PASSWORD"":""<var.db_password>""}}"
+kubectl rollout restart deployment/worker deployment/webapp-a deployment/webapp-b
+kubectl logs deploy/worker --tail=20   # expect: connected to redis / connected to postgres / syncing
+```
+
+### Result page shows 0 votes
+The worker isn't writing, or vote/result point at different Redis/DB. Compare env:
+```powershell
+kubectl exec deploy/webapp-a -- printenv REDIS_HOST
+kubectl exec deploy/worker   -- printenv REDIS_HOST DB_HOST DB_NAME
+kubectl exec deploy/webapp-b -- printenv DB_HOST DB_NAME
+# Query the worker's own DB directly:
+kubectl exec deploy/worker -- python -c "import os,psycopg2;c=psycopg2.connect(host=os.getenv('DB_HOST'),dbname=os.getenv('DB_NAME'),user=os.getenv('DB_USER'),password=os.getenv('DB_PASSWORD'));cur=c.cursor();cur.execute('SELECT vote,COUNT(id) FROM votes GROUP BY vote');print(cur.fetchall())"
+```
+
+### `/a` or `/b` returns 404
+GCE ingress does not strip the path prefix; the apps must serve those prefixes
+(already handled in `apps/vote` and `apps/result`). Rebuild if you changed them:
+`gcloud builds submit --config cloudbuild.yaml .`
+
+---
+
 ## Quick reference
 
 | Goal | Command |
@@ -137,3 +241,4 @@ terraform -chdir=terraform apply  -var project_id=project-pubsub-32009
 | Stop node cost | `gcloud container clusters resize gke-primary --node-pool default-pool --num-nodes 0 --region us-central1` |
 | Start app | `kubectl apply -f k8s/rendered-project-...yaml` then apply the ingress bundle |
 | Stop ALL cost | `terraform -chdir=terraform destroy -var project_id=project-pubsub-32009` |
+| Grafana BQ reader SA | `gcloud iam service-accounts create grafana-bq-reader ...` (roles: bigquery.dataViewer + jobUser) |

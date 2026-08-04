@@ -1,0 +1,27 @@
+# MultiClusterService for Web App A (vote).
+#
+# MCS aggregates the pods matching this selector ACROSS every cluster registered
+# in the Fleet (gke-primary + gke-secondary), giving one logical, cross-cluster
+# backend. The MultiClusterIngress below targets this MCS by name.
+#
+# Apply to the CONFIG cluster only (gke-primary):
+#   kubectl apply -f k8s/multicluster/mcs-webapp-a.yaml
+apiVersion: networking.gke.io/v1
+kind: MultiClusterService
+metadata:
+  name: webapp-a-mcs
+  namespace: default
+  annotations:
+    # Reuse the existing Cloud Armor + /healthz health-check policy on the
+    # multi-cluster backend, so WAF protection applies to global traffic too.
+    cloud.google.com/backend-config: '{"default":"webapps-backendconfig"}'
+spec:
+  template:
+    spec:
+      selector:
+        app: webapp-a
+      ports:
+      - name: web
+        protocol: TCP
+        port: 80
+        targetPort: 8080

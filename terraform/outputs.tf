@@ -44,3 +44,13 @@ output "webapp_b_pubsub_topic" {
   value       = var.enable_stateful_services ? google_pubsub_topic.webapp_b[0].name : null
   description = "Pub/Sub topic available to Web App B (null when disabled)."
 }
+
+output "mci_config_membership" {
+  value       = var.enable_multicluster_ingress ? google_gke_hub_membership.primary[0].membership_id : null
+  description = "Fleet membership used as the Multi-Cluster Ingress config cluster (null when MCI disabled)."
+}
+
+output "mci_enabled" {
+  value       = var.enable_multicluster_ingress
+  description = "Whether Multi-Cluster Ingress + Multi-Cluster Services are enabled."
+}

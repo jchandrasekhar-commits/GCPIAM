@@ -1,7 +1,13 @@
 # GKE DevOps Architecture
 
 ## Overview
-This design uses a primary GKE Standard cluster (`gke-primary`, `us-central1`) plus a symmetric secondary cluster (`gke-secondary`, `us-east1`) for multi-region high availability. The secondary is defined in Terraform and provisioned on demand via the `enable_secondary` variable (default `false` to stay within the free tier). Traffic enters through DNS and a global HTTP(S) load balancer, reaches GKE ingress, and is routed to two application services.
+This design uses a primary GKE Standard cluster (`gke-primary`, `us-central1`) plus a symmetric secondary cluster (`gke-secondary`, `us-east1`) for multi-region high availability. Both clusters are provisioned by default via the `enable_secondary` variable (default `true`); set it to `false` for a single-cluster deploy. Traffic enters through DNS and a global HTTP(S) load balancer, reaches GKE ingress, and is routed to two application services.
+
+### Global traffic: single-cluster Ingress vs. Multi-Cluster Ingress (MCI)
+There are two mutually exclusive front-door options:
+
+- **Single-cluster GKE Ingress** (`k8s/ingress.yaml`, default): one global HTTPS LB whose backends are only `gke-primary` pods.
+- **Multi-Cluster Ingress + Multi-Cluster Services** (`k8s/multicluster/`, enable with `enable_multicluster_ingress=true`): registers both clusters into a **GKE Fleet** and programs one global anycast LB that fans out to healthy `webapp-a`/`webapp-b` pods in **both** clusters, with proximity routing and automatic **regional failover**. Deploy the workloads to both clusters with `scripts/deploy-multicluster.ps1`. This satisfies requirement §4 (MCI/MCS) and cross-cluster app replication.
 
 ## Mermaid Diagram
 ```mermaid
@@ -30,12 +36,15 @@ flowchart LR
     ING --> SB --> PB
   end
 
-  subgraph GKE_SECONDARY["GKE Cluster: gke-secondary (us-east1, enable_secondary)"]
-    ING2[Ingress]
-    S2[Services]
-    P2[Pods]
-    ING2 --> S2 --> P2
+  subgraph GKE_SECONDARY["GKE Cluster: gke-secondary (us-east1)"]
+    S2[Services webapp-a/b]
+    P2[Pods webapp-a/b]
+    S2 --> P2
   end
+
+  %% Multi-Cluster Ingress (enable_multicluster_ingress=true) fans the same
+  %% global LB out to healthy pods in BOTH clusters with regional failover.
+  NEG -. "MCI/MCS" .-> S2
 
   PA --> NAT[Cloud NAT]
   PB --> NAT
@@ -47,7 +56,7 @@ flowchart LR
   PA --> GMP[Managed Prometheus]
   PA --> TRACE[Cloud Trace / Profiler]
   LOGS --> SINK[Logging Sink export-to-bq]
-  SINK --> BQ[BigQuery logs_webapp_us]
+  SINK --> BQ[BigQuery logs_dataset_us]
   BQ --> GRAF[Grafana BigQuery Datasource]
   GLB --> UPT[Uptime check + alert]
 ```
@@ -70,7 +79,7 @@ flowchart LR
 
 ## Observability Data Path
 1. App logs and platform events are written to Cloud Logging.
-2. Sink `export-to-bq` exports logs to BigQuery dataset `logs_webapp_us`.
+2. Sink `export-to-bq` exports logs to BigQuery dataset `logs_dataset_us`.
 3. Grafana queries BigQuery date-sharded tables (`stdout_*`, `stderr_*`, `events_*`, `requests_*`).
 4. Dashboard panels visualize error rate, restart signals, latency percentiles, and activity trend.
 
@@ -106,7 +115,7 @@ gcloud logging read "logName=projects/PROJECT_ID/logs/logging.googleapis.com%2Fs
 
 ### IaC Alignment
 - `terraform/main.tf`: BigQuery dataset location set to `US`.
-- `terraform/variables.tf`: default dataset set to `logs_webapp_us`.
+- `terraform/variables.tf`: default dataset set to `logs_dataset_us`.
 - Sink IAM uses `roles/bigquery.dataEditor` for the sink writer identity.
 
 ### Lesson Learned

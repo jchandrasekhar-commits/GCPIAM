@@ -20,12 +20,13 @@ variable "app_secret_value" {
 }
 
 # --- Secondary (DR) cluster -------------------------------------------------
-# Toggle the symmetric second GKE cluster on/off. Off by default to stay within
-# the free tier (a second zonal/Autopilot cluster incurs the GKE management fee).
+# Toggle the symmetric second GKE cluster on/off. On by default because the
+# assignment requires TWO GKE clusters (primary + secondary DR region). Set to
+# false to run a single cluster and avoid the second cluster's GKE management fee.
 variable "enable_secondary" {
   type        = bool
-  default     = false
-  description = "Set true to provision the symmetric secondary GKE cluster in var.secondary_region."
+  default     = true
+  description = "Provision the symmetric secondary GKE cluster in var.secondary_region. On by default to satisfy the two-cluster requirement; set false for a single-cluster (cheaper) deploy."
 }
 
 variable "secondary_region" {
@@ -44,6 +45,18 @@ variable "secondary_subnet_cidr" {
   type        = string
   default     = "10.20.0.0/20"
   description = "Non-overlapping CIDR for the secondary subnet."
+}
+
+# --- Multi-Cluster Ingress / Services (global traffic + cross-cluster) -------
+# Registers both clusters into a GKE Fleet and enables Multi-Cluster Ingress
+# (one global anycast L7 LB fanning out to healthy pods in BOTH clusters with
+# automatic regional failover) and Multi-Cluster Services (cross-cluster
+# east-west service discovery). Requires enable_secondary = true. Off by default
+# because it enables project-wide Fleet features and a second cluster's cost.
+variable "enable_multicluster_ingress" {
+  type        = bool
+  default     = false
+  description = "Register both GKE clusters into a Fleet and enable Multi-Cluster Ingress + Multi-Cluster Services. Requires enable_secondary = true."
 }
 
 # --- Private cluster hardening ----------------------------------------------

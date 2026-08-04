@@ -12,11 +12,16 @@ bq_dataset = "logs_dataset_us"
 # --- Secret Manager (override; do not commit real secrets) ------------------
 # app_secret_value = "your-real-secret"
 
-# --- Secondary (DR) cluster: off by default to stay in the free tier --------
-enable_secondary         = false
+# --- Secondary (DR) cluster: on by default to satisfy the two-cluster req ----
+enable_secondary         = true
 secondary_region         = "us-east1"
 secondary_node_locations = ["us-east1-b", "us-east1-c"]
 secondary_subnet_cidr    = "10.20.0.0/20"
+
+# --- Multi-Cluster Ingress + Multi-Cluster Services (global LB, failover) ----
+# Requires enable_secondary = true. Registers both clusters into a GKE Fleet and
+# enables MCI/MCS. After apply, run scripts/deploy-multicluster.ps1.
+enable_multicluster_ingress = false
 
 # --- Private cluster hardening ----------------------------------------------
 enable_private_nodes = true

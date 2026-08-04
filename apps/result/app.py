@@ -9,10 +9,17 @@ import os
 import psycopg2
 from flask import Flask, jsonify, render_template
 
+from telemetry import setup_error_reporting, setup_profiler, setup_tracing
+
 OPTION_A = os.getenv("OPTION_A", "GCP")
 OPTION_B = os.getenv("OPTION_B", "AWS")
 
 app = Flask(__name__)
+
+# Observability: distributed tracing (Cloud Trace), profiling, error reporting.
+setup_tracing("result", app)
+setup_profiler("result")
+error_client = setup_error_reporting(app)
 
 
 def get_conn():

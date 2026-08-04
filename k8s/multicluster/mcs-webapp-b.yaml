@@ -1,0 +1,24 @@
+# MultiClusterService for Web App B (result).
+#
+# Aggregates webapp-b pods across gke-primary + gke-secondary into one
+# cross-cluster backend targeted by the MultiClusterIngress.
+#
+# Apply to the CONFIG cluster only (gke-primary):
+#   kubectl apply -f k8s/multicluster/mcs-webapp-b.yaml
+apiVersion: networking.gke.io/v1
+kind: MultiClusterService
+metadata:
+  name: webapp-b-mcs
+  namespace: default
+  annotations:
+    cloud.google.com/backend-config: '{"default":"webapps-backendconfig"}'
+spec:
+  template:
+    spec:
+      selector:
+        app: webapp-b
+      ports:
+      - name: web
+        protocol: TCP
+        port: 80
+        targetPort: 8080

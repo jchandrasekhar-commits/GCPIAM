@@ -54,3 +54,8 @@ spec:
 # Container-native load balancing (NEG) is enabled on the Services, so the LB
 # routes directly to pods. Services are NodePort (see webapp-a/b-service.yaml).
 # No manual `kubectl patch` needed.
+#
+# NOTE: This Ingress serves gke-primary ONLY. For a single global LB that spans
+# BOTH clusters with regional failover, use Multi-Cluster Ingress instead:
+# terraform -var enable_multicluster_ingress=true, then k8s/multicluster/*.yaml
+# (do not apply this Ingress and the MultiClusterIngress at the same time).

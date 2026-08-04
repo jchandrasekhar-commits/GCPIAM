@@ -12,11 +12,18 @@ import socket
 import redis
 from flask import Flask, g, make_response, render_template, request
 
+from telemetry import setup_error_reporting, setup_profiler, setup_tracing
+
 OPTION_A = os.getenv("OPTION_A", "GCP")
 OPTION_B = os.getenv("OPTION_B", "AWS")
 HOSTNAME = socket.gethostname()
 
 app = Flask(__name__)
+
+# Observability: distributed tracing (Cloud Trace), profiling, error reporting.
+setup_tracing("vote", app)
+setup_profiler("vote")
+error_client = setup_error_reporting(app)
 
 
 def get_redis():
